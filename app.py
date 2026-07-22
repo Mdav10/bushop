@@ -62,6 +62,7 @@ os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'profiles'), exist_ok=True
 # ==================== COMPLETE MODELS ====================
 
 class User(UserMixin, db.Model):
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -90,15 +91,16 @@ class User(UserMixin, db.Model):
     recently_viewed = db.relationship('RecentlyViewed', backref='user', lazy=True)
 
 class Category(db.Model):
+    __tablename__ = 'categories'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     description = db.Column(db.String(200))
-    icon = db.Column(db.String(50))
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     products = db.relationship('Product', backref='category', lazy=True)
 
 class Product(db.Model):
+    __tablename__ = 'products'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     slug = db.Column(db.String(120), unique=True)
@@ -116,7 +118,7 @@ class Product(db.Model):
     sales_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
+    category_id = db.Column(db.Integer, db.ForeignKey('categories.id'))
     
     order_items = db.relationship('OrderItem', backref='product_ref', lazy=True)
     reviews = db.relationship('Review', backref='product_ref', lazy=True)
@@ -133,17 +135,19 @@ class Product(db.Model):
         return Review.query.filter_by(product_id=self.id).count()
 
 class ProductImage(db.Model):
+    __tablename__ = 'product_images'
     id = db.Column(db.Integer, primary_key=True)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     image = db.Column(db.String(200), nullable=False)
     is_primary = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     product = db.relationship('Product', backref='images')
 
 class Order(db.Model):
+    __tablename__ = 'orders'
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(20), unique=True, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
     subtotal = db.Column(db.Float)
     tax = db.Column(db.Float, default=0)
@@ -165,17 +169,19 @@ class Order(db.Model):
     payment_records = db.relationship('PaymentRecord', backref='order', lazy=True)
 
 class OrderItem(db.Model):
+    __tablename__ = 'order_items'
     id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
     product = db.relationship('Product', backref='order_items_ref')
 
 class Notification(db.Model):
+    __tablename__ = 'notifications'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     title = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
     type = db.Column(db.String(20), default='info')
@@ -184,16 +190,18 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Wishlist(db.Model):
+    __tablename__ = 'wishlists'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     product = db.relationship('Product', backref='wishlist_ref')
 
 class Review(db.Model):
+    __tablename__ = 'reviews'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     rating = db.Column(db.Integer, nullable=False)
     comment = db.Column(db.Text)
     is_approved = db.Column(db.Boolean, default=True)
@@ -201,26 +209,29 @@ class Review(db.Model):
     product = db.relationship('Product', backref='reviews_ref')
 
 class RecentlyViewed(db.Model):
+    __tablename__ = 'recently_viewed'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     viewed_at = db.Column(db.DateTime, default=datetime.utcnow)
     product = db.relationship('Product', backref='recently_viewed_ref')
 
 class PaymentRecord(db.Model):
+    __tablename__ = 'payment_records'
     id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     method = db.Column(db.String(20), default='lumicash')
     reference = db.Column(db.String(50))
     status = db.Column(db.String(20), default='pending')
-    verified_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    verified_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     verified_at = db.Column(db.DateTime)
     proof_image = db.Column(db.String(200))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class LoginAttempt(db.Model):
+    __tablename__ = 'login_attempts'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80))
     ip_address = db.Column(db.String(45))
@@ -228,8 +239,9 @@ class LoginAttempt(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class AuditLog(db.Model):
+    __tablename__ = 'audit_logs'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     action = db.Column(db.String(100), nullable=False)
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(45))
@@ -237,6 +249,7 @@ class AuditLog(db.Model):
     user = db.relationship('User', backref='audit_logs')
 
 class Coupon(db.Model):
+    __tablename__ = 'coupons'
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(50), unique=True, nullable=False)
     discount_type = db.Column(db.String(20), default='percentage')
@@ -250,6 +263,7 @@ class Coupon(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class ShippingMethod(db.Model):
+    __tablename__ = 'shipping_methods'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text)
@@ -324,7 +338,7 @@ def generate_slug(text):
     return slug
 
 def generate_invoice_html(order):
-    """Generate HTML invoice as fallback when reportlab is not available"""
+    """Generate HTML invoice as fallback"""
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -398,7 +412,7 @@ def generate_invoice_html(order):
     """
     return html
 
-# ==================== PUBLIC ROUTES ====================
+# ==================== ROUTES (All routes from previous code) ====================
 
 @app.route('/')
 def index():
@@ -1603,6 +1617,10 @@ def ratelimit_error(error):
 def init_db():
     with app.app_context():
         try:
+            # Drop all tables and recreate
+            db.drop_all()
+            print("✅ Dropped all tables")
+            
             db.create_all()
             print("✅ Database tables created")
             
