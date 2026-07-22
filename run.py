@@ -4,7 +4,6 @@ from werkzeug.security import generate_password_hash
 import os
 import sys
 import logging
-import time
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -27,15 +26,36 @@ def make_shell_context():
         'LoginAttempt': LoginAttempt
     }
 
-def init_db():
-    """Initialize the database with default admin user"""
+def ensure_database():
+    """Ensure database tables exist on startup"""
     try:
         with app.app_context():
-            logger.info("Creating database tables...")
-            # Create all tables
-            db.create_all()
-            logger.info("✅ Database tables created successfully!")
-            
+            # Check if we can query the users table
+            try:
+                User.query.first()
+                logger.info("✅ Database tables already exist")
+            except Exception as e:
+                logger.info("Creating database tables...")
+                db.create_all()
+                logger.info("✅ Database tables created")
+                
+                # Initialize default data if needed
+                init_default_data()
+                
+    except Exception as e:
+        logger.error(f"Database check failed: {str(e)}")
+        # Try to create tables anyway
+        try:
+            with app.app_context():
+                db.create_all()
+                logger.info("✅ Database tables created on retry")
+        except Exception as e2:
+            logger.error(f"Failed to create tables: {str(e2)}")
+
+def init_default_data():
+    """Initialize default data"""
+    try:
+        with app.app_context():
             # Create default categories
             categories = [
                 'Electronics', 'Clothing', 'Food', 'Home & Living',
@@ -48,7 +68,7 @@ def init_db():
                     db.session.add(category)
                     logger.info(f"Added category: {cat_name}")
             
-            # Create super admin (MCM)
+            # Create super admin
             if not User.query.filter_by(username='MCM').first():
                 admin = User(
                     username='MCM',
@@ -102,40 +122,16 @@ def init_db():
                         logger.info(f"Added demo product: {product.name}")
             
             db.session.commit()
-            logger.info("✅ Database initialized successfully!")
-            logger.info("✅ Super Admin: MCM")
-            logger.info("✅ Password: 08800Mcm!")
+            logger.info("✅ Default data initialized")
             
     except Exception as e:
-        logger.error(f"❌ Database initialization error: {str(e)}")
-        # Try to rollback on error
+        logger.error(f"Error initializing default data: {str(e)}")
         db.session.rollback()
-        raise
 
-# Initialize database before starting
+# Ensure database is ready on startup
+ensure_database()
+
 if __name__ == '__main__':
-    try:
-        # Force database initialization with retry
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                with app.app_context():
-                    logger.info(f"Database initialization attempt {attempt + 1}/{max_retries}...")
-                    db.create_all()
-                    init_db()
-                    break
-            except Exception as e:
-                logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
-                if attempt < max_retries - 1:
-                    logger.info("Waiting 5 seconds before retry...")
-                    time.sleep(5)
-                else:
-                    logger.error("All database initialization attempts failed!")
-                    raise
-        
-        port = int(os.environ.get('PORT', 5000))
-        logger.info(f"🚀 Starting BuShop on port {port}...")
-        app.run(host='0.0.0.0', port=port, debug=False)
-    except Exception as e:
-        logger.error(f"❌ Failed to start application: {str(e)}")
-        sys.exit(1)
+    port = int(os.environ.get('PORT', 5000))
+    logger.info(f"🚀 Starting BuShop on port {port}...")
+    app.run(host='0.0.0.0', port=port, debug=False)
