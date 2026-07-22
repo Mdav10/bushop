@@ -338,7 +338,6 @@ def generate_slug(text):
     return slug
 
 def generate_invoice_html(order):
-    """Generate HTML invoice as fallback"""
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -412,7 +411,7 @@ def generate_invoice_html(order):
     """
     return html
 
-# ==================== ROUTES (All routes from previous code) ====================
+# ==================== ROUTES ====================
 
 @app.route('/')
 def index():
@@ -988,54 +987,64 @@ def checkout():
     shipping_methods = ShippingMethod.query.filter_by(is_active=True).all()
     
     if request.method == 'POST':
-        shipping_method = request.form.get('shipping_method')
-        shipping_fee = float(request.form.get('shipping_fee', 0))
-        delivery_address = request.form.get('delivery_address', '').strip()
-        notes = request.form.get('notes', '').strip()
-        terms = request.form.get('terms')
-        
-        if not terms:
-            flash('⚠️ Please accept the Terms & Conditions.', 'danger')
-            return render_template('checkout.html', items=items, total=total, shipping_methods=shipping_methods)
-        
-        if not delivery_address:
-            flash('⚠️ Please provide a delivery address.', 'danger')
-            return render_template('checkout.html', items=items, total=total, shipping_methods=shipping_methods)
-        
-        order = Order(
-            order_number=generate_order_number(),
-            user_id=current_user.id,
-            total_amount=total + shipping_fee,
-            subtotal=total,
-            shipping_fee=shipping_fee,
-            delivery_address=delivery_address,
-            delivery_notes=notes,
-            status='pending',
-            payment_status='pending',
-            payment_method='lumicash'
-        )
-        
-        db.session.add(order)
-        db.session.commit()
-        
-        for item in items:
-            order_item = OrderItem(
-                order_id=order.id,
-                product_id=item['product'].id,
-                quantity=item['quantity'],
-                price=item['product'].price,
-                subtotal=item['subtotal']
-            )
-            db.session.add(order_item)
+        try:
+            shipping_method = request.form.get('shipping_method')
+            shipping_fee = float(request.form.get('shipping_fee', 0))
+            delivery_address = request.form.get('delivery_address', '').strip()
+            notes = request.form.get('notes', '').strip()
+            terms = request.form.get('terms')
             
-            item['product'].stock -= item['quantity']
-        
-        db.session.commit()
-        
-        session.pop('cart', None)
-        
-        flash(f'✅ Order #{order.order_number} created! Please complete payment.', 'success')
-        return redirect(url_for('customer_payment', order_id=order.id))
+            if not terms:
+                flash('⚠️ Please accept the Terms & Conditions.', 'danger')
+                return render_template('checkout.html', items=items, total=total, shipping_methods=shipping_methods)
+            
+            if not delivery_address:
+                flash('⚠️ Please provide a delivery address.', 'danger')
+                return render_template('checkout.html', items=items, total=total, shipping_methods=shipping_methods)
+            
+            # Create order
+            order = Order(
+                order_number=generate_order_number(),
+                user_id=current_user.id,
+                total_amount=total + shipping_fee,
+                subtotal=total,
+                shipping_fee=shipping_fee,
+                delivery_address=delivery_address,
+                delivery_notes=notes,
+                status='pending',
+                payment_status='pending',
+                payment_method='lumicash'
+            )
+            
+            db.session.add(order)
+            db.session.flush()  # This gets the order ID
+            
+            # Add order items
+            for item in items:
+                order_item = OrderItem(
+                    order_id=order.id,
+                    product_id=item['product'].id,
+                    quantity=item['quantity'],
+                    price=item['product'].price,
+                    subtotal=item['subtotal']
+                )
+                db.session.add(order_item)
+                
+                # Update stock
+                item['product'].stock -= item['quantity']
+            
+            db.session.commit()
+            
+            session.pop('cart', None)
+            
+            flash(f'✅ Order #{order.order_number} created! Please complete payment.', 'success')
+            return redirect(url_for('customer_payment', order_id=order.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Checkout error: {str(e)}")
+            flash(f'❌ Error creating order: {str(e)}', 'danger')
+            return render_template('checkout.html', items=items, total=total, shipping_methods=shipping_methods)
     
     return render_template('checkout.html', items=items, total=total, shipping_methods=shipping_methods)
 
@@ -1617,7 +1626,6 @@ def ratelimit_error(error):
 def init_db():
     with app.app_context():
         try:
-            # Drop all tables and recreate
             db.drop_all()
             print("✅ Dropped all tables")
             
