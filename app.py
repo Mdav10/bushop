@@ -10,11 +10,12 @@ import secrets
 from functools import wraps
 from sqlalchemy import text
 import logging
+import sys
 
-# Initialize Flask app
+print(f"Python version: {sys.version}")
+
 app = Flask(__name__)
 
-# Security Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(64))
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
 app.config['SESSION_COOKIE_SECURE'] = True
@@ -24,33 +25,32 @@ app.config['REMEMBER_COOKIE_SECURE'] = True
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)
 
-# Database Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///mugistore.db')
+database_url = os.environ.get('DATABASE_URL')
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///mugistore.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 10,
+    'pool_size': 5,
     'pool_recycle': 300,
     'pool_pre_ping': True,
     'pool_use_lifo': True
 }
 
-# File Upload Configuration
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
-# Initialize extensions
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'warning'
 login_manager.session_protection = 'strong'
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'products'), exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'payments'), exist_ok=True)
@@ -549,36 +549,39 @@ def admin_products():
 @admin_required
 def admin_product_create():
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        description = request.form.get('description', '').strip()
-        price = float(request.form.get('price', 0))
-        stock = int(request.form.get('stock', 0))
-        category_id = request.form.get('category_id')
-        whatsapp_link = request.form.get('whatsapp_link', '').strip()
-        
-        product = Product(
-            name=name,
-            description=description,
-            price=price,
-            stock=stock,
-            category_id=category_id if category_id else None,
-            whatsapp_link=whatsapp_link,
-            is_active=True
-        )
-        
-        if 'image' in request.files:
-            file = request.files['image']
-            if file.filename and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                filepath = os.path.join('static/uploads/products', filename)
-                file.save(filepath)
-                product.image = filepath
-        
-        db.session.add(product)
-        db.session.commit()
-        log_audit(current_user.id, 'CREATE_PRODUCT', f'Created product: {name}', request.remote_addr)
-        flash('✅ Product created successfully!', 'success')
-        return redirect(url_for('admin_products'))
+        try:
+            name = request.form.get('name', '').strip()
+            description = request.form.get('description', '').strip()
+            price = float(request.form.get('price', 0))
+            stock = int(request.form.get('stock', 0))
+            category_id = request.form.get('category_id')
+            whatsapp_link = request.form.get('whatsapp_link', '').strip()
+            
+            product = Product(
+                name=name,
+                description=description,
+                price=price,
+                stock=stock,
+                category_id=category_id if category_id else None,
+                whatsapp_link=whatsapp_link,
+                is_active=True
+            )
+            
+            if 'image' in request.files:
+                file = request.files['image']
+                if file.filename and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filepath = os.path.join('static/uploads/products', filename)
+                    file.save(filepath)
+                    product.image = filepath
+            
+            db.session.add(product)
+            db.session.commit()
+            log_audit(current_user.id, 'CREATE_PRODUCT', f'Created product: {name}', request.remote_addr)
+            flash('✅ Product created successfully!', 'success')
+            return redirect(url_for('admin_products'))
+        except Exception as e:
+            flash(f'❌ Error creating product: {str(e)}', 'danger')
     
     categories = Category.query.all()
     return render_template('admin/product_form.html', categories=categories)
@@ -590,26 +593,29 @@ def admin_product_edit(product_id):
     product = Product.query.get_or_404(product_id)
     
     if request.method == 'POST':
-        product.name = request.form.get('name', '').strip()
-        product.description = request.form.get('description', '').strip()
-        product.price = float(request.form.get('price', 0))
-        product.stock = int(request.form.get('stock', 0))
-        product.category_id = request.form.get('category_id')
-        product.whatsapp_link = request.form.get('whatsapp_link', '').strip()
-        product.is_active = bool(request.form.get('is_active'))
-        
-        if 'image' in request.files:
-            file = request.files['image']
-            if file.filename and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                filepath = os.path.join('static/uploads/products', filename)
-                file.save(filepath)
-                product.image = filepath
-        
-        db.session.commit()
-        log_audit(current_user.id, 'EDIT_PRODUCT', f'Edited product: {product.name}', request.remote_addr)
-        flash('✅ Product updated successfully!', 'success')
-        return redirect(url_for('admin_products'))
+        try:
+            product.name = request.form.get('name', '').strip()
+            product.description = request.form.get('description', '').strip()
+            product.price = float(request.form.get('price', 0))
+            product.stock = int(request.form.get('stock', 0))
+            product.category_id = request.form.get('category_id')
+            product.whatsapp_link = request.form.get('whatsapp_link', '').strip()
+            product.is_active = bool(request.form.get('is_active'))
+            
+            if 'image' in request.files:
+                file = request.files['image']
+                if file.filename and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filepath = os.path.join('static/uploads/products', filename)
+                    file.save(filepath)
+                    product.image = filepath
+            
+            db.session.commit()
+            log_audit(current_user.id, 'EDIT_PRODUCT', f'Edited product: {product.name}', request.remote_addr)
+            flash('✅ Product updated successfully!', 'success')
+            return redirect(url_for('admin_products'))
+        except Exception as e:
+            flash(f'❌ Error updating product: {str(e)}', 'danger')
     
     categories = Category.query.all()
     return render_template('admin/product_form.html', product=product, categories=categories)
@@ -793,35 +799,43 @@ def forbidden(error):
 
 def init_db():
     with app.app_context():
-        db.create_all()
-        
-        categories = ['Electronics', 'Clothing', 'Food', 'Home & Living', 
-                     'Beauty', 'Books', 'Sports', 'Toys', 'Auto', 'Phones']
-        for cat_name in categories:
-            if not Category.query.filter_by(name=cat_name).first():
-                category = Category(name=cat_name)
-                db.session.add(category)
-        
-        if not User.query.filter_by(username='MCM').first():
-            admin = User(
-                username='MCM',
-                email='mcm@mugistore.com',
-                password_hash=generate_password_hash('08800Mcm!'),
-                full_name='Master Administrator',
-                is_admin=True,
-                is_super_admin=True,
-                is_active=True,
-                phone='+25770000000'
-            )
-            db.session.add(admin)
-        
-        db.session.commit()
-        print("=" * 50)
-        print("✅ MugiStore Database Initialized!")
-        print("=" * 50)
-        print("🔐 Super Admin: MCM")
-        print("🔑 Password: 08800Mcm!")
-        print("=" * 50)
+        try:
+            db.create_all()
+            print("✅ Database tables created")
+            
+            categories = ['Electronics', 'Clothing', 'Food', 'Home & Living', 
+                         'Beauty', 'Books', 'Sports', 'Toys', 'Auto', 'Phones']
+            for cat_name in categories:
+                if not Category.query.filter_by(name=cat_name).first():
+                    category = Category(name=cat_name)
+                    db.session.add(category)
+                    print(f"Added category: {cat_name}")
+            
+            if not User.query.filter_by(username='MCM').first():
+                admin = User(
+                    username='MCM',
+                    email='mcm@mugistore.com',
+                    password_hash=generate_password_hash('08800Mcm!'),
+                    full_name='Master Administrator',
+                    is_admin=True,
+                    is_super_admin=True,
+                    is_active=True,
+                    phone='+25770000000'
+                )
+                db.session.add(admin)
+                print("✅ Super Admin created: MCM / 08800Mcm!")
+            
+            db.session.commit()
+            print("=" * 50)
+            print("✅ MugiStore Database Initialized!")
+            print("=" * 50)
+            print("🔐 Super Admin: MCM")
+            print("🔑 Password: 08800Mcm!")
+            print("=" * 50)
+        except Exception as e:
+            print(f"❌ Database initialization error: {str(e)}")
+            db.session.rollback()
+            raise
 
 # ==================== RUN APPLICATION ====================
 
