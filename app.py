@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -25,7 +25,7 @@ app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)
 
 # Database Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///bushop.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///mugistore.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 10,
@@ -55,23 +55,12 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'products'), exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'payments'), exist_ok=True)
 
-# Security Headers
-@app.after_request
-def security_headers(response):
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    return response
-
 # ==================== MODELS ====================
 
 class User(UserMixin, db.Model):
-    __tablename__ = 'users'
-    
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     full_name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(20))
@@ -84,24 +73,18 @@ class User(UserMixin, db.Model):
     last_ip = db.Column(db.String(45))
     failed_attempts = db.Column(db.Integer, default=0)
     locked_until = db.Column(db.DateTime)
-    
     orders = db.relationship('Order', backref='customer', lazy=True)
     notifications = db.relationship('Notification', backref='user', lazy=True)
 
 class Category(db.Model):
-    __tablename__ = 'categories'
-    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     description = db.Column(db.String(200))
-    icon = db.Column(db.String(50))
     products = db.relationship('Product', backref='category', lazy=True)
 
 class Product(db.Model):
-    __tablename__ = 'products'
-    
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     price = db.Column(db.Float, nullable=False)
     stock = db.Column(db.Integer, default=0)
@@ -109,14 +92,12 @@ class Product(db.Model):
     whatsapp_link = db.Column(db.String(200))
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    category_id = db.Column(db.Integer, db.ForeignKey('categories.id'))
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
 
 class Order(db.Model):
-    __tablename__ = 'orders'
-    
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(20), unique=True, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='pending')
     payment_status = db.Column(db.String(20), default='pending')
@@ -127,21 +108,17 @@ class Order(db.Model):
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
 
 class OrderItem(db.Model):
-    __tablename__ = 'order_items'
-    
     id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
     product = db.relationship('Product')
 
 class Notification(db.Model):
-    __tablename__ = 'notifications'
-    
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     title = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
     type = db.Column(db.String(20), default='info')
@@ -149,23 +126,20 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class LoginAttempt(db.Model):
-    __tablename__ = 'login_attempts'
-    
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), index=True)
-    ip_address = db.Column(db.String(45), index=True)
+    username = db.Column(db.String(80))
+    ip_address = db.Column(db.String(45))
     success = db.Column(db.Boolean, default=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class AuditLog(db.Model):
-    __tablename__ = 'audit_logs'
-    
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     action = db.Column(db.String(100), nullable=False)
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(45))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', backref='audit_logs')
 
 # ==================== HELPERS ====================
 
@@ -223,7 +197,7 @@ def notify_user(user_id, title, message, type='info'):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
-# ==================== ROUTES ====================
+# ==================== PUBLIC ROUTES ====================
 
 @app.route('/')
 def index():
@@ -260,6 +234,8 @@ def about():
 def contact():
     return render_template('contact.html')
 
+# ==================== AUTH ROUTES ====================
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -271,7 +247,6 @@ def login():
         remember = True if request.form.get('remember') else False
         ip = request.remote_addr
         
-        # Rate limiting check
         attempts = LoginAttempt.query.filter_by(
             username=username, 
             ip_address=ip,
@@ -285,7 +260,6 @@ def login():
         user = User.query.filter_by(username=username).first()
         
         if not user or not check_password_hash(user.password_hash, password):
-            # Log failed attempt
             login_attempt = LoginAttempt(username=username, ip_address=ip, success=False)
             db.session.add(login_attempt)
             
@@ -298,7 +272,6 @@ def login():
             flash('❌ Invalid username or password.', 'danger')
             return render_template('login.html')
         
-        # Check if account is locked
         if user.locked_until and user.locked_until > datetime.utcnow():
             flash('🔒 Account is temporarily locked. Please try again later.', 'danger')
             return render_template('login.html')
@@ -307,20 +280,17 @@ def login():
             flash('❌ Account is deactivated.', 'danger')
             return render_template('login.html')
         
-        # Successful login
         user.failed_attempts = 0
         user.locked_until = None
         user.last_login = datetime.utcnow()
         user.last_ip = ip
         db.session.commit()
         
-        # Log successful login
         login_attempt = LoginAttempt(username=username, ip_address=ip, success=True)
         db.session.add(login_attempt)
         db.session.commit()
         
         log_audit(user.id, 'LOGIN', f'User logged in from IP {ip}', ip)
-        
         login_user(user, remember=remember)
         
         flash(f'✅ Welcome back, {user.full_name}!', 'success')
@@ -349,7 +319,6 @@ def register():
         full_name = request.form.get('full_name', '').strip()
         phone = request.form.get('phone', '').strip()
         
-        # Validate
         if User.query.filter_by(username=username).first():
             flash('❌ Username already exists.', 'danger')
             return render_template('register.html')
@@ -381,6 +350,68 @@ def register():
         return redirect(url_for('login'))
     
     return render_template('register.html')
+
+# ==================== CUSTOMER ROUTES ====================
+
+@app.route('/customer/dashboard')
+@login_required
+def customer_dashboard():
+    if current_user.is_admin:
+        return redirect(url_for('admin_dashboard'))
+    
+    orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).limit(10).all()
+    notifications = Notification.query.filter_by(user_id=current_user.id, is_read=False).all()
+    cart_count = sum(session.get('cart', {}).values())
+    
+    return render_template('customer/dashboard.html', 
+                         orders=orders, 
+                         notifications=notifications,
+                         cart_count=cart_count)
+
+@app.route('/customer/orders')
+@login_required
+def customer_orders():
+    orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
+    return render_template('customer/orders.html', orders=orders)
+
+@app.route('/customer/order/<int:order_id>')
+@login_required
+def customer_order(order_id):
+    order = Order.query.get_or_404(order_id)
+    if order.user_id != current_user.id:
+        flash('⚠️ Access denied.', 'danger')
+        return redirect(url_for('customer_dashboard'))
+    return render_template('customer/order_detail.html', order=order)
+
+@app.route('/customer/notifications')
+@login_required
+def customer_notifications():
+    notifications = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).all()
+    for n in notifications:
+        n.is_read = True
+    db.session.commit()
+    return render_template('customer/notifications.html', notifications=notifications)
+
+@app.route('/customer/profile', methods=['GET', 'POST'])
+@login_required
+def customer_profile():
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        address = request.form.get('address', '').strip()
+        
+        if full_name:
+            current_user.full_name = full_name
+        if phone:
+            current_user.phone = phone
+        if address:
+            current_user.address = address
+        
+        db.session.commit()
+        flash('✅ Profile updated successfully!', 'success')
+        return redirect(url_for('customer_profile'))
+    
+    return render_template('customer/profile.html')
 
 @app.route('/checkout', methods=['GET', 'POST'])
 @login_required
@@ -479,68 +510,6 @@ def health():
         return jsonify({'status': 'healthy', 'database': 'connected'})
     except Exception as e:
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
-
-# ==================== CUSTOMER ROUTES ====================
-
-@app.route('/customer/dashboard')
-@login_required
-def customer_dashboard():
-    if current_user.is_admin:
-        return redirect(url_for('admin_dashboard'))
-    
-    orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).limit(10).all()
-    notifications = Notification.query.filter_by(user_id=current_user.id, is_read=False).all()
-    cart_count = sum(session.get('cart', {}).values())
-    
-    return render_template('customer/dashboard.html', 
-                         orders=orders, 
-                         notifications=notifications,
-                         cart_count=cart_count)
-
-@app.route('/customer/orders')
-@login_required
-def customer_orders():
-    orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
-    return render_template('customer/orders.html', orders=orders)
-
-@app.route('/customer/order/<int:order_id>')
-@login_required
-def customer_order(order_id):
-    order = Order.query.get_or_404(order_id)
-    if order.user_id != current_user.id:
-        flash('⚠️ Access denied.', 'danger')
-        return redirect(url_for('customer_dashboard'))
-    return render_template('customer/order_detail.html', order=order)
-
-@app.route('/customer/notifications')
-@login_required
-def customer_notifications():
-    notifications = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).all()
-    for n in notifications:
-        n.is_read = True
-    db.session.commit()
-    return render_template('customer/notifications.html', notifications=notifications)
-
-@app.route('/customer/profile', methods=['GET', 'POST'])
-@login_required
-def customer_profile():
-    if request.method == 'POST':
-        full_name = request.form.get('full_name', '').strip()
-        phone = request.form.get('phone', '').strip()
-        address = request.form.get('address', '').strip()
-        
-        if full_name:
-            current_user.full_name = full_name
-        if phone:
-            current_user.phone = phone
-        if address:
-            current_user.address = address
-        
-        db.session.commit()
-        flash('✅ Profile updated successfully!', 'success')
-        return redirect(url_for('customer_profile'))
-    
-    return render_template('customer/profile.html')
 
 # ==================== ADMIN ROUTES ====================
 
@@ -826,7 +795,6 @@ def init_db():
     with app.app_context():
         db.create_all()
         
-        # Create categories
         categories = ['Electronics', 'Clothing', 'Food', 'Home & Living', 
                      'Beauty', 'Books', 'Sports', 'Toys', 'Auto', 'Phones']
         for cat_name in categories:
@@ -834,11 +802,10 @@ def init_db():
                 category = Category(name=cat_name)
                 db.session.add(category)
         
-        # Create super admin
         if not User.query.filter_by(username='MCM').first():
             admin = User(
                 username='MCM',
-                email='mcm@bushop.com',
+                email='mcm@mugistore.com',
                 password_hash=generate_password_hash('08800Mcm!'),
                 full_name='Master Administrator',
                 is_admin=True,
@@ -850,7 +817,7 @@ def init_db():
         
         db.session.commit()
         print("=" * 50)
-        print("✅ Database initialized successfully!")
+        print("✅ MugiStore Database Initialized!")
         print("=" * 50)
         print("🔐 Super Admin: MCM")
         print("🔑 Password: 08800Mcm!")

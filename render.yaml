@@ -1,13 +1,13 @@
 services:
   - type: web
-    name: bushop
+    name: mugistore
     env: python
     buildCommand: ./build.sh
     startCommand: gunicorn app:app --workers=2 --threads=4 --timeout=120 --max-requests=1000 --max-requests-jitter=100 --bind 0.0.0.0:$PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: bushop-db
+          name: mugistore-db
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
@@ -21,8 +21,8 @@ services:
     autoDeploy: true
 
 databases:
-  - name: bushop-db
-    databaseName: bushop
-    user: bushop_user
+  - name: mugistore-db
+    databaseName: mugistore
+    user: mugistore_user
     plan: free
     postgresMajorVersion: 15

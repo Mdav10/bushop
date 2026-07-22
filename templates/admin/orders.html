@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Manage Orders - BuShop{% endblock %}
+{% block title %}Manage Orders - MugiStore{% endblock %}
 {% block content %}
 <h1 class="mb-4"><i class="bi bi-clipboard"></i> Manage Orders</h1>
 
-<div class="btn-group mb-3">
+<div class="btn-group mb-3 flex-wrap">
     <a href="/admin/orders?status=all" class="btn btn-outline-primary {% if current_status == 'all' %}active{% endif %}">All</a>
     <a href="/admin/orders?status=pending" class="btn btn-outline-warning {% if current_status == 'pending' %}active{% endif %}">Pending</a>
     <a href="/admin/orders?status=processing" class="btn btn-outline-info {% if current_status == 'processing' %}active{% endif %}">Processing</a>

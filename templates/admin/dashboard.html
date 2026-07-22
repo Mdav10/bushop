@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Admin Dashboard - BuShop{% endblock %}
+{% block title %}Admin Dashboard - MugiStore{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-speedometer2"></i> Admin Dashboard</h1>
@@ -7,39 +7,55 @@
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
+    <div class="col-6 col-md-3 mb-3">
+        <div class="card bg-primary text-white admin-stat" onclick="location.href='/admin/customers'">
             <div class="card-body">
-                <h5><i class="bi bi-people"></i> Total Customers</h5>
-                <h2 class="stat-number">{{ total_customers }}</h2>
-                <a href="/admin/customers" class="text-white">View all →</a>
+                <div class="stat-label"><i class="bi bi-people"></i> Total Customers</div>
+                <div class="stat-number">{{ total_customers }}</div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
+    <div class="col-6 col-md-3 mb-3">
+        <div class="card bg-success text-white admin-stat" onclick="location.href='/admin/orders'">
             <div class="card-body">
-                <h5><i class="bi bi-currency-dollar"></i> Total Revenue</h5>
-                <h2 class="stat-number">{{ "{:,.0f}".format(total_revenue) }}</h2>
+                <div class="stat-label"><i class="bi bi-currency-dollar"></i> Total Revenue</div>
+                <div class="stat-number">{{ "{:,.0f}".format(total_revenue) }}</div>
                 <small>FBu</small>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-warning text-dark">
+    <div class="col-6 col-md-3 mb-3">
+        <div class="card bg-warning text-dark admin-stat" onclick="location.href='/admin/orders?status=pending'">
             <div class="card-body">
-                <h5><i class="bi bi-clock-history"></i> Pending Payments</h5>
-                <h2 class="stat-number">{{ pending_payments }}</h2>
-                <a href="/admin/orders?status=pending" class="text-dark">Verify now →</a>
+                <div class="stat-label"><i class="bi bi-clock-history"></i> Pending Payments</div>
+                <div class="stat-number">{{ pending_payments }}</div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-info text-white">
+    <div class="col-6 col-md-3 mb-3">
+        <div class="card bg-info text-white admin-stat" onclick="location.href='/admin/orders?status=pending'">
             <div class="card-body">
-                <h5><i class="bi bi-hourglass-split"></i> Pending Orders</h5>
-                <h2 class="stat-number">{{ pending_orders }}</h2>
-                <a href="/admin/orders?status=pending" class="text-white">Process now →</a>
+                <div class="stat-label"><i class="bi bi-hourglass-split"></i> Pending Orders</div>
+                <div class="stat-number">{{ pending_orders }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-6 col-md-3 mb-3">
+        <div class="card bg-secondary text-white admin-stat" onclick="location.href='/admin/products'">
+            <div class="card-body">
+                <div class="stat-label"><i class="bi bi-box"></i> Total Products</div>
+                <div class="stat-number">{{ total_products }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3 mb-3">
+        <div class="card bg-danger text-white admin-stat" onclick="location.href='/admin/products'">
+            <div class="card-body">
+                <div class="stat-label"><i class="bi bi-exclamation-triangle"></i> Out of Stock</div>
+                <div class="stat-number">{{ out_of_stock }}</div>
             </div>
         </div>
     </div>

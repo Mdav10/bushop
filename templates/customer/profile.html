@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}My Profile - MugiStore{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h1 class="mb-4"><i class="bi bi-person-circle"></i> My Profile</h1>
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="full_name" class="form-control" value="{{ current_user.full_name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="text" name="phone" class="form-control" value="{{ current_user.phone or '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <textarea name="address" class="form-control" rows="2">{{ current_user.address or '' }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
+                        <small class="text-muted">Username cannot be changed</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" value="{{ current_user.email }}" disabled>
+                        <small class="text-muted">Email cannot be changed</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Update Profile</button>
+                    <a href="/customer/dashboard" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
