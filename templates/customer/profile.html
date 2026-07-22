@@ -6,31 +6,51 @@
         <h1 class="mb-4"><i class="bi bi-person-circle"></i> My Profile</h1>
         <div class="card">
             <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Full Name</label>
-                        <input type="text" name="full_name" class="form-control" value="{{ current_user.full_name }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Phone</label>
-                        <input type="text" name="phone" class="form-control" value="{{ current_user.phone or '' }}">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Full Name</label>
+                                <input type="text" name="full_name" class="form-control" value="{{ current_user.full_name }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Phone</label>
+                                <input type="text" name="phone" class="form-control" value="{{ current_user.phone or '' }}">
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Address</label>
                         <textarea name="address" class="form-control" rows="2">{{ current_user.address or '' }}</textarea>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Username</label>
+                        <label class="form-label">Profile Image</label>
+                        <input type="file" name="profile_image" class="form-control" accept="image/*">
+                        {% if current_user.profile_image %}
+                        <div class="mt-2">
+                            <img src="{{ current_user.profile_image }}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 50%;">
+                        </div>
+                        {% endif %}
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <label class="form-label">Username (Read-only)</label>
                         <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
-                        <small class="text-muted">Username cannot be changed</small>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Email</label>
+                        <label class="form-label">Email (Read-only)</label>
                         <input type="email" class="form-control" value="{{ current_user.email }}" disabled>
-                        <small class="text-muted">Email cannot be changed</small>
                     </div>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Update Profile</button>
-                    <a href="/customer/dashboard" class="btn btn-secondary">Cancel</a>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Update Profile</button>
+                        <a href="/customer/change-password" class="btn btn-outline-primary"><i class="bi bi-key"></i> Change Password</a>
+                        <form method="POST" action="/customer/delete-account" onsubmit="return confirm('Are you sure you want to delete your account? This cannot be undone.')">
+                            <button type="submit" class="btn btn-danger w-100"><i class="bi bi-exclamation-triangle"></i> Delete Account</button>
+                        </form>
+                        <a href="/customer/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+                    </div>
                 </form>
             </div>
         </div>

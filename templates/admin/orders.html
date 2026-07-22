@@ -3,16 +3,45 @@
 {% block content %}
 <h1 class="mb-4"><i class="bi bi-clipboard"></i> Manage Orders</h1>
 
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <input type="text" name="search" class="form-control" placeholder="Search order #..." value="{{ request.args.get('search', '') }}">
+            </div>
+            <div class="col-md-3">
+                <input type="text" name="customer" class="form-control" placeholder="Customer name..." value="{{ request.args.get('customer', '') }}">
+            </div>
+            <div class="col-md-2">
+                <select name="payment" class="form-control">
+                    <option value="">All Payment</option>
+                    <option value="pending" {% if request.args.get('payment') == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="approved" {% if request.args.get('payment') == 'approved' %}selected{% endif %}>Approved</option>
+                    <option value="rejected" {% if request.args.get('payment') == 'rejected' %}selected{% endif %}>Rejected</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+            </div>
+            <div class="col-md-2">
+                <a href="/admin/order/export/csv" class="btn btn-success w-100"><i class="bi bi-file-earmark-text"></i> CSV</a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="btn-group mb-3 flex-wrap">
     <a href="/admin/orders?status=all" class="btn btn-outline-primary {% if current_status == 'all' %}active{% endif %}">All</a>
     <a href="/admin/orders?status=pending" class="btn btn-outline-warning {% if current_status == 'pending' %}active{% endif %}">Pending</a>
     <a href="/admin/orders?status=processing" class="btn btn-outline-info {% if current_status == 'processing' %}active{% endif %}">Processing</a>
+    <a href="/admin/orders?status=shipping" class="btn btn-outline-primary {% if current_status == 'shipping' %}active{% endif %}">Shipping</a>
     <a href="/admin/orders?status=completed" class="btn btn-outline-success {% if current_status == 'completed' %}active{% endif %}">Completed</a>
     <a href="/admin/orders?status=cancelled" class="btn btn-outline-danger {% if current_status == 'cancelled' %}active{% endif %}">Cancelled</a>
 </div>
 
 <div class="card">
     <div class="card-body">
+        {% if orders %}
         <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead>
@@ -29,12 +58,12 @@
                 <tbody>
                     {% for order in orders %}
                     <tr>
-                        <td>{{ order.order_number }}</td>
+                        <td><small>{{ order.order_number }}</small></td>
                         <td>{{ order.customer.full_name }}</td>
                         <td>{{ order.created_at.strftime('%Y-%m-%d') }}</td>
                         <td>{{ "{:,.0f}".format(order.total_amount) }} FBu</td>
                         <td>
-                            <span class="badge bg-{{ 'success' if order.status == 'completed' else 'warning' if order.status == 'pending' else 'info' if order.status == 'processing' else 'danger' }}">
+                            <span class="badge bg-{{ 'success' if order.status == 'completed' else 'warning' if order.status == 'pending' else 'info' if order.status == 'processing' else 'primary' if order.status == 'shipping' else 'danger' }}">
                                 {{ order.status }}
                             </span>
                         </td>
@@ -51,6 +80,9 @@
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <p class="text-center text-muted py-3">No orders found.</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

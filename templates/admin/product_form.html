@@ -43,15 +43,21 @@
                         </div>
                         <div class="col-6">
                             <div class="mb-3">
+                                <label class="form-label">Compare Price</label>
+                                <input type="number" name="compare_price" class="form-control" step="0.01" value="{{ product.compare_price if product else '' }}" placeholder="Original price">
+                                <small class="text-muted">Shows as crossed out</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="mb-3">
                                 <label class="form-label">Stock</label>
                                 <input type="number" name="stock" class="form-control" value="{{ product.stock if product else 0 }}" placeholder="0">
                             </div>
                         </div>
-                        <div class="col-12">
+                        <div class="col-6">
                             <div class="mb-3">
                                 <label class="form-label">WhatsApp Link</label>
                                 <input type="url" name="whatsapp_link" class="form-control" value="{{ product.whatsapp_link if product else '' }}" placeholder="https://wa.me/257XXXXXXXXX">
-                                <small class="text-muted">Customers can contact you via WhatsApp</small>
                             </div>
                         </div>
                         <div class="col-12">
@@ -66,10 +72,16 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="col-12">
+                        <div class="col-6">
                             <div class="mb-3 form-check">
                                 <input type="checkbox" name="is_active" class="form-check-input" id="is_active" {% if not product or product.is_active %}checked{% endif %}>
                                 <label class="form-check-label" for="is_active">Active (visible to customers)</label>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" name="is_featured" class="form-check-input" id="is_featured" {% if product and product.is_featured %}checked{% endif %}>
+                                <label class="form-check-label" for="is_featured">⭐ Featured Product</label>
                             </div>
                         </div>
                     </div>

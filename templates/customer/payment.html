@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Payment - Order {{ order.order_number }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-credit-card"></i> Payment for Order #{{ order.order_number }}</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h5><i class="bi bi-info-circle"></i> Payment Instructions</h5>
+                    <p>Please send <strong>{{ "{:,.0f}".format(order.total_amount) }} FBu</strong> via Lumicash to:</p>
+                    <p><strong>Phone:</strong> +257 70 000 000</p>
+                    <p><strong>Reference:</strong> {{ order.order_number }}</p>
+                </div>
+
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Payment Method</label>
+                        <select name="payment_method" class="form-control">
+                            <option value="lumicash">Lumicash</option>
+                            <option value="mobile_money">Mobile Money</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Payment Proof (Screenshot)</label>
+                        <input type="file" name="payment_proof" class="form-control" accept="image/*" required>
+                        <small class="text-muted">Upload a screenshot of your payment confirmation (PNG, JPG, JPEG, GIF, WEBP)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Any additional information about your payment"></textarea>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-upload"></i> Upload Payment Proof</button>
+                        <a href="/customer/order/{{ order.id }}" class="btn btn-secondary">Back to Order</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

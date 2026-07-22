@@ -5,10 +5,18 @@
     <div class="col-md-3">
         <div class="card mb-4">
             <div class="card-body text-center">
-                <i class="bi bi-person-circle display-4 text-primary"></i>
+                <div class="position-relative d-inline-block">
+                    <i class="bi bi-person-circle display-1 text-primary"></i>
+                    {% if current_user.profile_image %}
+                    <img src="{{ current_user.profile_image }}" class="rounded-circle" style="width: 80px; height: 80px; object-fit: cover;">
+                    {% endif %}
+                </div>
                 <h5 class="mt-2">{{ current_user.full_name }}</h5>
                 <p class="text-muted">{{ current_user.email }}</p>
-                <a href="/customer/profile" class="btn btn-outline-primary btn-sm">Edit Profile</a>
+                <div class="d-grid gap-1">
+                    <a href="/customer/profile" class="btn btn-outline-primary btn-sm">Edit Profile</a>
+                    <a href="/customer/change-password" class="btn btn-outline-secondary btn-sm">Change Password</a>
+                </div>
             </div>
         </div>
         <div class="card">
@@ -16,14 +24,17 @@
             <div class="card-body">
                 <p><strong>Total Orders:</strong> {{ current_user.orders|length }}</p>
                 <p><strong>Total Spent:</strong> {{ "{:,.0f}".format(current_user.orders|sum(attribute='total_amount')) }} FBu</p>
+                <p><strong>Wishlist:</strong> {{ current_user.wishlist|length }} items</p>
             </div>
         </div>
     </div>
     
     <div class="col-md-9">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="bi bi-clock-history"></i> Recent Orders</h5>
+        <!-- Recent Orders -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Orders</h5>
+                <a href="/customer/orders" class="btn btn-sm btn-primary">View All</a>
             </div>
             <div class="card-body">
                 {% if orders %}
@@ -42,11 +53,11 @@
                         <tbody>
                             {% for order in orders %}
                             <tr>
-                                <td>{{ order.order_number }}</td>
+                                <td><small>{{ order.order_number }}</small></td>
                                 <td>{{ order.created_at.strftime('%Y-%m-%d') }}</td>
                                 <td>{{ "{:,.0f}".format(order.total_amount) }} FBu</td>
                                 <td>
-                                    <span class="badge bg-{{ 'success' if order.status == 'completed' else 'warning' if order.status == 'pending' else 'info' }}">
+                                    <span class="badge bg-{{ 'success' if order.status == 'completed' else 'warning' if order.status == 'pending' else 'info' if order.status == 'processing' else 'danger' if order.status == 'cancelled' else 'secondary' }}">
                                         {{ order.status }}
                                     </span>
                                 </td>
@@ -57,36 +68,91 @@
                                 </td>
                                 <td>
                                     <a href="/customer/order/{{ order.id }}" class="btn btn-sm btn-info">View</a>
+                                    {% if order.status in ['pending', 'processing'] %}
+                                    <form method="POST" action="/customer/order/cancel/{{ order.id }}" class="d-inline" onsubmit="return confirm('Cancel this order?')">
+                                        <button type="submit" class="btn btn-sm btn-danger">Cancel</button>
+                                    </form>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-                <a href="/customer/orders" class="btn btn-primary">View All Orders</a>
                 {% else %}
-                <p class="text-center text-muted">You haven't placed any orders yet.</p>
+                <p class="text-center text-muted py-3">You haven't placed any orders yet.</p>
                 <a href="/products" class="btn btn-primary">Start Shopping</a>
                 {% endif %}
             </div>
         </div>
-        
+
+        <!-- Wishlist -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                <h5 class="mb-0"><i class="bi bi-heart"></i> Wishlist</h5>
+                <a href="/customer/wishlist" class="btn btn-sm btn-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if wishlist %}
+                <div class="row">
+                    {% for item in wishlist[:4] %}
+                    <div class="col-3">
+                        <div class="text-center">
+                            <img src="{% if item.product.image %}{{ item.product.image }}{% else %}https://via.placeholder.com/80x80{% endif %}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;">
+                            <p class="small text-truncate mt-1">{{ item.product.name[:20] }}</p>
+                            <a href="/customer/wishlist/remove/{{ item.product.id }}" class="text-danger small" onclick="return confirm('Remove from wishlist?')">Remove</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center text-muted py-2">Your wishlist is empty.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recently Viewed -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock"></i> Recently Viewed</h5>
+            </div>
+            <div class="card-body">
+                {% if recent %}
+                <div class="row">
+                    {% for item in recent %}
+                    <div class="col-2">
+                        <a href="/product/{{ item.product.id }}">
+                            <img src="{% if item.product.image %}{{ item.product.image }}{% else %}https://via.placeholder.com/60x60{% endif %}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;">
+                            <p class="small text-truncate">{{ item.product.name[:15] }}</p>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center text-muted py-2">No recently viewed products.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Notifications -->
         {% if notifications %}
         <div class="card mt-4">
-            <div class="card-header">
-                <h5><i class="bi bi-bell"></i> Notifications</h5>
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                <h5 class="mb-0"><i class="bi bi-bell"></i> Notifications</h5>
+                <a href="/customer/notifications" class="btn btn-sm btn-primary">View All</a>
             </div>
             <div class="card-body">
                 <ul class="list-group">
-                    {% for notification in notifications %}
-                    <li class="list-group-item">
-                        <strong>{{ notification.title }}</strong><br>
-                        {{ notification.message }}
-                        <small class="text-muted d-block">{{ notification.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    {% for notification in notifications[:3] %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ notification.title }}</strong><br>
+                            <small>{{ notification.message[:100] }}{% if notification.message|length > 100 %}...{% endif %}</small>
+                        </div>
+                        <small class="text-muted">{{ notification.created_at.strftime('%H:%M') }}</small>
                     </li>
                     {% endfor %}
                 </ul>
-                <a href="/customer/notifications" class="btn btn-link mt-2">View all notifications</a>
             </div>
         </div>
         {% endif %}
