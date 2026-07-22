@@ -7,8 +7,6 @@ from datetime import datetime, timedelta
 import os
 import re
 import secrets
-import hashlib
-import hmac
 from functools import wraps
 from sqlalchemy import text
 import logging
@@ -64,7 +62,6 @@ def security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; connect-src 'self';"
     return response
 
 # ==================== MODELS ====================
@@ -222,6 +219,9 @@ def notify_user(user_id, title, message, type='info'):
         db.session.commit()
     except Exception as e:
         logger.error(f"Notification error: {str(e)}")
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 # ==================== ROUTES ====================
 
@@ -599,7 +599,7 @@ def admin_product_create():
         
         if 'image' in request.files:
             file = request.files['image']
-            if file.filename:
+            if file.filename and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
                 filepath = os.path.join('static/uploads/products', filename)
                 file.save(filepath)
@@ -631,7 +631,7 @@ def admin_product_edit(product_id):
         
         if 'image' in request.files:
             file = request.files['image']
-            if file.filename:
+            if file.filename and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
                 filepath = os.path.join('static/uploads/products', filename)
                 file.save(filepath)
@@ -826,7 +826,7 @@ def init_db():
     with app.app_context():
         db.create_all()
         
-        # Create categories (only structure, no demo products)
+        # Create categories
         categories = ['Electronics', 'Clothing', 'Food', 'Home & Living', 
                      'Beauty', 'Books', 'Sports', 'Toys', 'Auto', 'Phones']
         for cat_name in categories:
@@ -854,8 +854,6 @@ def init_db():
         print("=" * 50)
         print("🔐 Super Admin: MCM")
         print("🔑 Password: 08800Mcm!")
-        print("=" * 50)
-        print("📦 Categories created. You can now add real products.")
         print("=" * 50)
 
 # ==================== RUN APPLICATION ====================
