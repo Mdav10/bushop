@@ -12,11 +12,18 @@ from functools import wraps
 from sqlalchemy import text, desc, func
 import logging
 import io
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
+
+# Try to import reportlab, fallback if not available
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    HAS_REPORTLAB = True
+except ImportError:
+    HAS_REPORTLAB = False
+    print("⚠️ reportlab not installed. PDF invoice will use HTML fallback.")
 
 print(f"Python version: {__import__('sys').version}")
 
@@ -325,6 +332,81 @@ def generate_slug(text):
     slug = re.sub(r'^-+|-+$', '', slug)
     return slug
 
+def generate_invoice_html(order):
+    """Generate HTML invoice as fallback when reportlab is not available"""
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Invoice #{order.order_number}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; padding: 40px; }}
+            .header {{ text-align: center; border-bottom: 2px solid #667eea; padding-bottom: 20px; }}
+            .header h1 {{ color: #667eea; margin: 0; }}
+            .info {{ margin: 20px 0; }}
+            .info table {{ width: 100%; }}
+            .info td {{ padding: 5px; }}
+            .items {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            .items th {{ background: #667eea; color: white; padding: 10px; text-align: left; }}
+            .items td {{ padding: 10px; border-bottom: 1px solid #ddd; }}
+            .total {{ text-align: right; font-size: 18px; font-weight: bold; color: #667eea; }}
+            .footer {{ text-align: center; margin-top: 40px; color: #666; font-size: 12px; }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>MugiStore</h1>
+            <p>Invoice #{order.order_number}</p>
+            <p>Date: {order.created_at.strftime('%B %d, %Y at %H:%M')}</p>
+        </div>
+        <div class="info">
+            <table>
+                <tr>
+                    <td><strong>Customer:</strong> {order.customer.full_name}</td>
+                    <td><strong>Email:</strong> {order.customer.email}</td>
+                </tr>
+                <tr>
+                    <td><strong>Phone:</strong> {order.customer.phone or 'N/A'}</td>
+                    <td><strong>Address:</strong> {order.delivery_address or 'Not provided'}</td>
+                </tr>
+            </table>
+        </div>
+        <table class="items">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+    """
+    for item in order.items:
+        html += f"""
+                <tr>
+                    <td>{item.product.name}</td>
+                    <td>{item.quantity}</td>
+                    <td>{item.price:,.0f} FBu</td>
+                    <td>{item.subtotal:,.0f} FBu</td>
+                </tr>
+        """
+    html += f"""
+            </tbody>
+        </table>
+        <div class="total">
+            <p>Total: {order.total_amount:,.0f} FBu</p>
+        </div>
+        <div class="footer">
+            <p>Thank you for shopping with MugiStore!</p>
+            <p>© {datetime.utcnow().year} MugiStore. All rights reserved.</p>
+        </div>
+    </body>
+    </html>
+    """
+    return html
+
 # ==================== PUBLIC ROUTES ====================
 
 @app.route('/')
@@ -364,9 +446,8 @@ def products():
     elif sort == 'popular':
         query = query.order_by(Product.sales_count.desc())
     elif sort == 'rating':
-        # Complex sorting would need subquery, simplified
         query = query.order_by(Product.views.desc())
-    else:  # newest
+    else:
         query = query.order_by(Product.created_at.desc())
     
     products = query.paginate(page=page, per_page=24)
@@ -377,11 +458,9 @@ def products():
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
     
-    # Track view
     product.views += 1
     db.session.commit()
     
-    # Track recently viewed
     if current_user.is_authenticated:
         recent = RecentlyViewed.query.filter_by(user_id=current_user.id, product_id=product.id).first()
         if not recent:
@@ -391,7 +470,6 @@ def product_detail(product_id):
             recent.viewed_at = datetime.utcnow()
         db.session.commit()
     
-    # Get related products
     related = Product.query.filter_by(category_id=product.category_id, is_active=True).filter(Product.id != product.id).limit(4).all()
     reviews = Review.query.filter_by(product_id=product.id, is_approved=True).all()
     avg_rating = product.get_rating()
@@ -594,7 +672,6 @@ def customer_order_reorder(order_id):
         flash('⚠️ Access denied.', 'danger')
         return redirect(url_for('customer_dashboard'))
     
-    # Add all items to cart
     cart = session.get('cart', {})
     for item in order.items:
         cart[str(item.product_id)] = cart.get(str(item.product_id), 0) + item.quantity
@@ -611,49 +688,9 @@ def customer_order_invoice(order_id):
         flash('⚠️ Access denied.', 'danger')
         return redirect(url_for('customer_dashboard'))
     
-    # Generate PDF invoice
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
-    styles = getSampleStyleSheet()
-    elements = []
-    
-    # Title
-    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#667eea'))
-    elements.append(Paragraph('MugiStore - Invoice', title_style))
-    elements.append(Spacer(1, 0.25*inch))
-    
-    # Order info
-    elements.append(Paragraph(f'Order #: {order.order_number}', styles['Heading2']))
-    elements.append(Paragraph(f'Date: {order.created_at.strftime("%B %d, %Y at %H:%M")}', styles['Normal']))
-    elements.append(Paragraph(f'Customer: {order.customer.full_name}', styles['Normal']))
-    elements.append(Spacer(1, 0.25*inch))
-    
-    # Items table
-    data = [['Product', 'Quantity', 'Price', 'Subtotal']]
-    for item in order.items:
-        data.append([item.product.name, str(item.quantity), f"{item.price:,.0f} FBu", f"{item.subtotal:,.0f} FBu"])
-    
-    table = Table(data)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 14),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-    ]))
-    elements.append(table)
-    elements.append(Spacer(1, 0.25*inch))
-    
-    # Total
-    elements.append(Paragraph(f'Total: {order.total_amount:,.0f} FBu', styles['Heading2']))
-    
-    doc.build(elements)
-    buffer.seek(0)
-    
-    return send_file(buffer, as_attachment=True, download_name=f'invoice_{order.order_number}.pdf', mimetype='application/pdf')
+    # Generate HTML invoice
+    html = generate_invoice_html(order)
+    return html
 
 @app.route('/customer/payment/<int:order_id>', methods=['GET', 'POST'])
 @login_required
@@ -811,13 +848,11 @@ def customer_change_password():
 @app.route('/customer/delete-account', methods=['POST'])
 @login_required
 def customer_delete_account():
-    # Check if user has orders
     orders = Order.query.filter_by(user_id=current_user.id).count()
     if orders > 0:
         flash('❌ Cannot delete account with orders. Contact support.', 'danger')
         return redirect(url_for('customer_profile'))
     
-    # Deactivate instead of delete
     current_user.is_active = False
     db.session.commit()
     logout_user()
@@ -839,7 +874,6 @@ def cart():
             total += subtotal
             items.append({'product': product, 'quantity': quantity, 'subtotal': subtotal})
         else:
-            # Remove unavailable products
             del cart[product_id]
             session['cart'] = cart
     
@@ -851,7 +885,6 @@ def api_cart_add():
     product_id = request.form.get('product_id')
     quantity = int(request.form.get('quantity', 1))
     
-    # Validate stock
     product = Product.query.get(int(product_id))
     if not product or not product.is_active:
         return jsonify({'success': False, 'error': 'Product unavailable'})
@@ -903,8 +936,7 @@ def api_cart_remove():
 @app.route('/api/cart/get')
 @login_required
 def api_cart_get():
-    cart = session.get('cart', {})
-    return jsonify(cart)
+    return jsonify(session.get('cart', {}))
 
 @app.route('/api/cart/count')
 @login_required
@@ -992,7 +1024,6 @@ def checkout():
             )
             db.session.add(order_item)
             
-            # Update stock
             item['product'].stock -= item['quantity']
         
         db.session.commit()
@@ -1020,13 +1051,11 @@ def admin_dashboard():
     out_of_stock = Product.query.filter_by(stock=0, is_active=True).count()
     low_stock = Product.query.filter(Product.stock <= 5, Product.stock > 0, Product.is_active == True).count()
     
-    # Monthly revenue for chart
     monthly_revenue = db.session.query(
         func.strftime('%Y-%m', Order.created_at).label('month'),
         func.sum(Order.total_amount).label('total')
     ).filter(Order.status == 'completed').group_by('month').order_by('month').limit(12).all()
     
-    # Top products
     top_products = db.session.query(
         Product.id,
         Product.name,
@@ -1139,7 +1168,6 @@ def admin_product_edit(product_id):
                     filename = secure_filename(file.filename)
                     filepath = os.path.join('static/uploads/products', filename)
                     file.save(filepath)
-                    # Delete old image
                     if product.image and os.path.exists(os.path.join('app', product.image)):
                         try:
                             os.remove(os.path.join('app', product.image))
@@ -1163,7 +1191,6 @@ def admin_product_edit(product_id):
 def admin_product_delete(product_id):
     product = Product.query.get_or_404(product_id)
     name = product.name
-    # Delete image
     if product.image and os.path.exists(os.path.join('app', product.image)):
         try:
             os.remove(os.path.join('app', product.image))
@@ -1272,42 +1299,20 @@ def admin_order_update(order_id):
     flash(f'✅ Order updated to {order.status}.', 'success')
     return redirect(url_for('admin_order', order_id=order_id))
 
-@app.route('/admin/order/export/<format>')
+@app.route('/admin/order/export/csv')
 @login_required
 @admin_required
-def admin_order_export(format):
+def admin_order_export_csv():
     orders = Order.query.order_by(Order.created_at.desc()).all()
     
-    if format == 'csv':
-        import csv
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(['Order #', 'Customer', 'Date', 'Total', 'Status', 'Payment'])
-        for order in orders:
-            writer.writerow([order.order_number, order.customer.full_name, order.created_at.strftime('%Y-%m-%d'), order.total_amount, order.status, order.payment_status])
-        output.seek(0)
-        return send_file(io.BytesIO(output.getvalue().encode()), as_attachment=True, download_name='orders.csv', mimetype='text/csv')
-    
-    elif format == 'excel':
-        import pandas as pd
-        data = []
-        for order in orders:
-            data.append({
-                'Order #': order.order_number,
-                'Customer': order.customer.full_name,
-                'Date': order.created_at.strftime('%Y-%m-%d'),
-                'Total': order.total_amount,
-                'Status': order.status,
-                'Payment': order.payment_status
-            })
-        df = pd.DataFrame(data)
-        output = io.BytesIO()
-        df.to_excel(output, index=False)
-        output.seek(0)
-        return send_file(output, as_attachment=True, download_name='orders.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    
-    flash('Invalid format.', 'danger')
-    return redirect(url_for('admin_orders'))
+    import csv
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Order #', 'Customer', 'Date', 'Total', 'Status', 'Payment'])
+    for order in orders:
+        writer.writerow([order.order_number, order.customer.full_name, order.created_at.strftime('%Y-%m-%d'), order.total_amount, order.status, order.payment_status])
+    output.seek(0)
+    return send_file(io.BytesIO(output.getvalue().encode()), as_attachment=True, download_name='orders.csv', mimetype='text/csv')
 
 @app.route('/admin/categories')
 @login_required
@@ -1611,7 +1616,6 @@ def init_db():
             db.create_all()
             print("✅ Database tables created")
             
-            # Create categories
             categories = ['Electronics', 'Clothing', 'Food', 'Home & Living', 
                          'Beauty', 'Books', 'Sports', 'Toys', 'Auto', 'Phones']
             for cat_name in categories:
@@ -1620,7 +1624,6 @@ def init_db():
                     db.session.add(category)
                     print(f"Added category: {cat_name}")
             
-            # Create shipping methods
             shipping_methods = [
                 {'name': 'Standard Delivery', 'cost': 0, 'days': 3},
                 {'name': 'Express Delivery', 'cost': 2000, 'days': 1},
@@ -1637,7 +1640,6 @@ def init_db():
                     db.session.add(shipping)
                     print(f"Added shipping method: {method['name']}")
             
-            # Create super admin
             if not User.query.filter_by(username='MCM').first():
                 admin = User(
                     username='MCM',
