@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Checkout - BuShop{% endblock %}
+{% block content %}
+<h1 class="mb-4">Checkout</h1>
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header"><h5><i class="bi bi-pencil"></i> Order Details</h5></div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Delivery Address *</label>
+                        <textarea name="delivery_address" class="form-control" rows="3" placeholder="Enter your delivery address" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Any special instructions"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-check-circle"></i> Place Order</button>
+                    <a href="/products" class="btn btn-secondary btn-lg"><i class="bi bi-arrow-left"></i> Continue Shopping</a>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white"><h5><i class="bi bi-cart"></i> Order Summary</h5></div>
+            <div class="card-body">
+                {% if products %}
+                    {% for item in products %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>{{ item.product.name }} × {{ item.quantity }}</span>
+                        <span>{{ "{:,.0f}".format(item.subtotal) }} FBu</span>
+                    </div>
+                    {% endfor %}
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <strong>Total</strong>
+                        <strong class="text-primary">{{ "{:,.0f}".format(total) }} FBu</strong>
+                    </div>
+                {% else %}
+                    <p class="text-center text-muted">Your cart is empty</p>
+                    <a href="/products" class="btn btn-primary w-100">Browse Products</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

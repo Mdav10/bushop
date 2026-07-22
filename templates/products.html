@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Products - BuShop{% endblock %}
+{% block content %}
+<h1 class="mb-4">All Products</h1>
+<div class="row mb-4">
+    <div class="col-md-6">
+        <form method="GET" action="/products" class="d-flex">
+            <input type="text" name="search" class="form-control me-2" placeholder="Search products...">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i></button>
+        </form>
+    </div>
+    <div class="col-md-6">
+        <select class="form-control" onchange="window.location.href='/products?category='+this.value">
+            <option value="">All Categories</option>
+            {% for category in categories %}
+            <option value="{{ category.id }}">{{ category.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+<div class="row">
+    {% for product in products.items %}
+    <div class="col-md-3 mb-4">
+        <div class="card h-100">
+            <img src="{% if product.image %}{{ product.image }}{% else %}https://via.placeholder.com/300x200{% endif %}" class="card-img-top product-image" alt="{{ product.name }}">
+            <div class="card-body">
+                <h5 class="card-title">{{ product.name }}</h5>
+                <p class="card-text text-truncate">{{ product.description[:100] if product.description else 'No description' }}</p>
+                <p class="card-text"><strong>{{ "{:,.0f}".format(product.price) }} FBu</strong></p>
+                <a href="/product/{{ product.id }}" class="btn btn-primary btn-sm">View Details</a>
+                <button onclick="addToCart({{ product.id }})" class="btn btn-success btn-sm"><i class="bi bi-cart-plus"></i></button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% if products.pages > 1 %}
+<nav>
+    <ul class="pagination justify-content-center">
+        {% for page in range(1, products.pages + 1) %}
+        <li class="page-item {% if page == products.page %}active{% endif %}">
+            <a class="page-link" href="/products?page={{ page }}{% if request.args.get('category') %}&category={{ request.args.get('category') }}{% endif %}{% if request.args.get('search') %}&search={{ request.args.get('search') }}{% endif %}">{{ page }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

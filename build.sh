@@ -1,14 +1,16 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Starting build process for BuShop..."
+echo "🚀 Building BuShop..."
 
 # Install dependencies
-echo "📦 Installing Python dependencies..."
 pip install -r requirements.txt
 
-# Reset and initialize database
-echo "🗄️  Resetting and initializing database..."
-python reset_db.py
+# Initialize database
+echo "🗄️ Initializing database..."
+python -c "
+from app import init_db
+init_db()
+"
 
-echo "✅ Build completed successfully!"
+echo "✅ Build complete!"

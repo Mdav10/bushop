@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Manage Admins - BuShop{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-shield-lock"></i> Manage Admins</h1>
+    <a href="/admin/admin/create" class="btn btn-success"><i class="bi bi-plus-circle"></i> Create Admin</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for admin in admins %}
+                    <tr>
+                        <td><strong>{{ admin.username }}</strong></td>
+                        <td>{{ admin.full_name }}</td>
+                        <td>{{ admin.email }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if admin.is_super_admin else 'primary' }}">
+                                {{ 'Super Admin' if admin.is_super_admin else 'Admin' }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if admin.is_active else 'danger' }}">
+                                {{ 'Active' if admin.is_active else 'Inactive' }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if admin.id != current_user.id %}
+                            <a href="/admin/admin/toggle/{{ admin.id }}" class="btn btn-sm btn-{{ 'warning' if admin.is_active else 'success' }}">
+                                {{ 'Deactivate' if admin.is_active else 'Activate' }}
+                            </a>
+                            <a href="/admin/admin/delete/{{ admin.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this admin?')">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                            {% else %}
+                            <span class="text-muted"><i class="bi bi-person"></i> You</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

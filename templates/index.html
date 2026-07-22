@@ -1,16 +1,12 @@
 {% extends "base.html" %}
-
-{% block title %}BuShop - Best Products in Burundi{% endblock %}
-
+{% block title %}Home - Best Products in Burundi{% endblock %}
 {% block content %}
-<div class="jumbotron bg-light p-5 rounded-3 mb-4">
+<div class="jumbotron mb-4">
     <h1 class="display-4">Welcome to BuShop</h1>
     <p class="lead">Discover quality products and shop with confidence in Burundi.</p>
-    <hr class="my-4">
+    <hr class="my-4 bg-light">
     <p>Browse our catalog, place orders, and pay easily with Lumicash.</p>
-    <a href="{{ url_for('main.products') }}" class="btn btn-primary btn-lg">
-        <i class="bi bi-grid"></i> Start Shopping
-    </a>
+    <a href="/products" class="btn btn-primary btn-lg"><i class="bi bi-grid"></i> Start Shopping</a>
 </div>
 
 <div class="row mb-4">
@@ -18,7 +14,7 @@
         <div class="card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-person-check fs-1 text-primary"></i>
-                <h5 class="card-title">Register & Shop</h5>
+                <h5 class="card-title mt-3">Register & Shop</h5>
                 <p class="card-text">Create your account and start browsing our product catalog.</p>
             </div>
         </div>
@@ -27,7 +23,7 @@
         <div class="card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-credit-card fs-1 text-primary"></i>
-                <h5 class="card-title">Pay with Lumicash</h5>
+                <h5 class="card-title mt-3">Pay with Lumicash</h5>
                 <p class="card-text">Easy and secure payments through Lumicash mobile money.</p>
             </div>
         </div>
@@ -36,7 +32,7 @@
         <div class="card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-truck fs-1 text-primary"></i>
-                <h5 class="card-title">Track Orders</h5>
+                <h5 class="card-title mt-3">Track Orders</h5>
                 <p class="card-text">Follow your orders from payment to delivery.</p>
             </div>
         </div>
@@ -48,21 +44,13 @@
     {% for product in products %}
     <div class="col-md-3 mb-4">
         <div class="card h-100">
-            {% if product.image %}
-            <img src="{{ url_for('static', filename=product.image.replace('static/', '')) }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
-            {% else %}
-            <img src="https://via.placeholder.com/300x200" class="card-img-top" alt="{{ product.name }}">
-            {% endif %}
+            <img src="{% if product.image %}{{ product.image }}{% else %}https://via.placeholder.com/300x200{% endif %}" class="card-img-top product-image" alt="{{ product.name }}">
             <div class="card-body">
                 <h5 class="card-title">{{ product.name }}</h5>
-                <p class="card-text text-truncate">{{ product.description[:100] }}</p>
-                <p class="card-text"><strong>{{ product.price }} FBu</strong></p>
-                <a href="{{ url_for('main.product_detail', product_id=product.id) }}" class="btn btn-primary btn-sm">View Details</a>
-                {% if product.whatsapp_link %}
-                <a href="{{ product.whatsapp_link }}" target="_blank" class="btn btn-success btn-sm">
-                    <i class="bi bi-whatsapp"></i> Contact
-                </a>
-                {% endif %}
+                <p class="card-text text-truncate">{{ product.description[:100] if product.description else 'No description' }}</p>
+                <p class="card-text"><strong>{{ "{:,.0f}".format(product.price) }} FBu</strong></p>
+                <a href="/product/{{ product.id }}" class="btn btn-primary btn-sm">View Details</a>
+                <button onclick="addToCart({{ product.id }})" class="btn btn-success btn-sm"><i class="bi bi-cart-plus"></i></button>
             </div>
         </div>
     </div>

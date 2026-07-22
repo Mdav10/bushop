@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if product else 'Create' }} Product - BuShop{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="bi bi-{{ 'pencil' if product else 'plus-circle' }}"></i> {{ 'Edit' if product else 'Create' }} Product</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Name *</label>
+                                <input type="text" name="name" class="form-control" value="{{ product.name if product else '' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Category</label>
+                                <select name="category_id" class="form-control">
+                                    <option value="">Select Category</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}" {% if product and product.category_id == category.id %}selected{% endif %}>
+                                        {{ category.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="3">{{ product.description if product else '' }}</textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Price (FBu) *</label>
+                                <input type="number" name="price" class="form-control" step="0.01" value="{{ product.price if product else '' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Stock</label>
+                                <input type="number" name="stock" class="form-control" value="{{ product.stock if product else 0 }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">WhatsApp Link</label>
+                        <input type="url" name="whatsapp_link" class="form-control" value="{{ product.whatsapp_link if product else '' }}" placeholder="https://wa.me/257XXXXXXXXX">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Product Image</label>
+                        <input type="file" name="image" class="form-control" accept="image/*">
+                        {% if product and product.image %}
+                        <div class="mt-2">
+                            <img src="{{ product.image }}" style="max-width: 150px; border-radius: 5px;">
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="is_active" class="form-check-input" id="is_active" {% if not product or product.is_active %}checked{% endif %}>
+                        <label class="form-check-label" for="is_active">Active (visible to customers)</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Save</button>
+                    <a href="/admin/products" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
