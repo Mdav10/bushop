@@ -1,42 +1,26 @@
+#!/usr/bin/env python
+import os
+import sys
+import time
 from app import create_app, db
 from app.models import User, Product, Category, Order, OrderItem, Notification, PaymentRecord, AuditLog, LoginAttempt
 from werkzeug.security import generate_password_hash
-import os
-import sys
 import logging
-import time
 
-# Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = create_app()
-
-@app.shell_context_processor
-def make_shell_context():
-    return {
-        'db': db,
-        'User': User,
-        'Product': Product,
-        'Category': Category,
-        'Order': Order,
-        'OrderItem': OrderItem,
-        'Notification': Notification,
-        'PaymentRecord': PaymentRecord,
-        'AuditLog': AuditLog,
-        'LoginAttempt': LoginAttempt
-    }
-
-def init_db():
-    """Initialize the database with default admin user"""
+def init_database():
+    """Initialize database with tables and demo data"""
+    app = create_app()
+    
     try:
         with app.app_context():
             logger.info("Creating database tables...")
-            # Create all tables
             db.create_all()
-            logger.info("✅ Database tables created successfully!")
+            logger.info("✅ Tables created successfully")
             
-            # Create default categories
+            # Create categories
             categories = [
                 'Electronics', 'Clothing', 'Food', 'Home & Living',
                 'Beauty', 'Books', 'Sports', 'Toys', 'Auto', 'Phones'
@@ -48,7 +32,7 @@ def init_db():
                     db.session.add(category)
                     logger.info(f"Added category: {cat_name}")
             
-            # Create super admin (MCM)
+            # Create super admin
             if not User.query.filter_by(username='MCM').first():
                 admin = User(
                     username='MCM',
@@ -102,40 +86,26 @@ def init_db():
                         logger.info(f"Added demo product: {product.name}")
             
             db.session.commit()
-            logger.info("✅ Database initialized successfully!")
+            logger.info("✅ Database initialization complete!")
             logger.info("✅ Super Admin: MCM")
             logger.info("✅ Password: 08800Mcm!")
+            return True
             
     except Exception as e:
         logger.error(f"❌ Database initialization error: {str(e)}")
-        # Try to rollback on error
         db.session.rollback()
-        raise
+        return False
 
-# Initialize database before starting
 if __name__ == '__main__':
-    try:
-        # Force database initialization with retry
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                with app.app_context():
-                    logger.info(f"Database initialization attempt {attempt + 1}/{max_retries}...")
-                    db.create_all()
-                    init_db()
-                    break
-            except Exception as e:
-                logger.error(f"Attempt {attempt + 1} failed: {str(e)}")
-                if attempt < max_retries - 1:
-                    logger.info("Waiting 5 seconds before retry...")
-                    time.sleep(5)
-                else:
-                    logger.error("All database initialization attempts failed!")
-                    raise
-        
-        port = int(os.environ.get('PORT', 5000))
-        logger.info(f"🚀 Starting BuShop on port {port}...")
-        app.run(host='0.0.0.0', port=port, debug=False)
-    except Exception as e:
-        logger.error(f"❌ Failed to start application: {str(e)}")
-        sys.exit(1)
+    # Try multiple times
+    max_retries = 3
+    for attempt in range(max_retries):
+        logger.info(f"Attempt {attempt + 1}/{max_retries}...")
+        if init_database():
+            sys.exit(0)
+        if attempt < max_retries - 1:
+            logger.info("Waiting 5 seconds before retry...")
+            time.sleep(5)
+    
+    logger.error("All initialization attempts failed!")
+    sys.exit(1)

@@ -2,9 +2,6 @@ from app import db
 from flask_login import UserMixin
 from datetime import datetime
 from sqlalchemy import func, Index
-import hashlib
-import hmac
-import secrets
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'

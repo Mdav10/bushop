@@ -4,8 +4,8 @@ services:
     env: python
     buildCommand: |
       pip install -r requirements.txt
-      python -c "from app import create_app, db; from app.models import User; app = create_app(); db.create_all()"
-    startCommand: gunicorn run:app
+      python init_db.py
+    startCommand: gunicorn run:app --workers=2 --threads=4 --timeout=120 --max-requests=1000 --max-requests-jitter=100
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -21,15 +21,20 @@ services:
         value: 3.11.0
       - key: FLASK_ENV
         value: production
+      - key: FLASK_DEBUG
+        value: false
+      - key: FLASK_APP
+        value: run.py
     buildFilter:
       paths:
         - app/**
         - requirements.txt
         - run.py
+        - init_db.py
         - render.yaml
-    healthCheckPath: /
+        - Procfile
+    healthCheckPath: /health
     autoDeploy: true
-    plan: free
 
 databases:
   - name: bushop-db
