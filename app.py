@@ -13,18 +13,6 @@ from sqlalchemy import text, desc, func
 import logging
 import io
 
-# Try to import reportlab, fallback if not available
-try:
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import letter, A4
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import inch
-    HAS_REPORTLAB = True
-except ImportError:
-    HAS_REPORTLAB = False
-    print("⚠️ reportlab not installed. PDF invoice will use HTML fallback.")
-
 print(f"Python version: {__import__('sys').version}")
 
 app = Flask(__name__)
@@ -130,10 +118,10 @@ class Product(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
     
-    order_items = db.relationship('OrderItem', backref='product', lazy=True)
-    reviews = db.relationship('Review', backref='product', lazy=True)
-    wishlist = db.relationship('Wishlist', backref='product', lazy=True)
-    recently_viewed = db.relationship('RecentlyViewed', backref='product', lazy=True)
+    order_items = db.relationship('OrderItem', backref='product_ref', lazy=True)
+    reviews = db.relationship('Review', backref='product_ref', lazy=True)
+    wishlist = db.relationship('Wishlist', backref='product_ref', lazy=True)
+    recently_viewed = db.relationship('RecentlyViewed', backref='product_ref', lazy=True)
     
     def get_rating(self):
         reviews = Review.query.filter_by(product_id=self.id).all()
@@ -183,7 +171,7 @@ class OrderItem(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
-    product = db.relationship('Product')
+    product = db.relationship('Product', backref='order_items_ref')
 
 class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -200,6 +188,7 @@ class Wishlist(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    product = db.relationship('Product', backref='wishlist_ref')
 
 class Review(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -209,12 +198,14 @@ class Review(db.Model):
     comment = db.Column(db.Text)
     is_approved = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    product = db.relationship('Product', backref='reviews_ref')
 
 class RecentlyViewed(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     viewed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    product = db.relationship('Product', backref='recently_viewed_ref')
 
 class PaymentRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -688,7 +679,6 @@ def customer_order_invoice(order_id):
         flash('⚠️ Access denied.', 'danger')
         return redirect(url_for('customer_dashboard'))
     
-    # Generate HTML invoice
     html = generate_invoice_html(order)
     return html
 
