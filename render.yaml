@@ -2,8 +2,10 @@ services:
   - type: web
     name: bushop
     env: python
-    buildCommand: ./build.sh
-    startCommand: gunicorn run:app --workers=2 --threads=4 --timeout=120 --max-requests=1000 --max-requests-jitter=100 --bind 0.0.0.0:$PORT
+    buildCommand: |
+      chmod +x build.sh
+      ./build.sh
+    startCommand: gunicorn run:app --workers=2 --threads=4 --timeout=120 --bind 0.0.0.0:$PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -13,24 +15,12 @@ services:
         generateValue: true
       - key: CSRF_SECRET_KEY
         generateValue: true
-      - key: SECURITY_PASSWORD_SALT
-        generateValue: true
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: FLASK_ENV
         value: production
       - key: FLASK_DEBUG
         value: false
-      - key: FLASK_APP
-        value: run.py
-    buildFilter:
-      paths:
-        - app/**
-        - requirements.txt
-        - run.py
-        - build.sh
-        - render.yaml
-        - Procfile
     healthCheckPath: /health
     autoDeploy: true
 
