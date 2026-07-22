@@ -8,9 +8,6 @@ pip install -r requirements.txt
 
 # Initialize database
 echo "🗄️ Initializing database..."
-python -c "
-from app import init_db
-init_db()
-"
+python -c "from app import init_db; init_db()"
 
 echo "✅ Build complete!"

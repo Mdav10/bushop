@@ -3,7 +3,7 @@ services:
     name: bushop
     env: python
     buildCommand: ./build.sh
-    startCommand: gunicorn app:app --workers=2 --threads=4 --timeout=120 --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:app --workers=2 --threads=4 --timeout=120 --max-requests=1000 --max-requests-jitter=100 --bind 0.0.0.0:$PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -13,6 +13,10 @@ services:
         generateValue: true
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: false
     healthCheckPath: /health
     autoDeploy: true
 

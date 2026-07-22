@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -7,34 +7,74 @@ from datetime import datetime, timedelta
 import os
 import re
 import secrets
+import hashlib
+import hmac
 from functools import wraps
 from sqlalchemy import text
+import logging
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+
+# Security Configuration
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(64))
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['REMEMBER_COOKIE_SECURE'] = True
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=7)
+
+# Database Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///bushop.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 10,
+    'pool_recycle': 300,
+    'pool_pre_ping': True,
+    'pool_use_lifo': True
+}
+
+# File Upload Configuration
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 # Initialize extensions
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'warning'
+login_manager.session_protection = 'strong'
 
-# Ensure upload directory exists
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'products'), exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'payments'), exist_ok=True)
 
+# Security Headers
+@app.after_request
+def security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; connect-src 'self';"
+    return response
+
 # ==================== MODELS ====================
 
 class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(200), nullable=False)
     full_name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(20))
@@ -44,16 +84,27 @@ class User(UserMixin, db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+    last_ip = db.Column(db.String(45))
+    failed_attempts = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime)
+    
+    orders = db.relationship('Order', backref='customer', lazy=True)
+    notifications = db.relationship('Notification', backref='user', lazy=True)
 
 class Category(db.Model):
+    __tablename__ = 'categories'
+    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     description = db.Column(db.String(200))
+    icon = db.Column(db.String(50))
     products = db.relationship('Product', backref='category', lazy=True)
 
 class Product(db.Model):
+    __tablename__ = 'products'
+    
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
+    name = db.Column(db.String(100), nullable=False, index=True)
     description = db.Column(db.Text)
     price = db.Column(db.Float, nullable=False)
     stock = db.Column(db.Integer, default=0)
@@ -61,12 +112,14 @@ class Product(db.Model):
     whatsapp_link = db.Column(db.String(200))
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
+    category_id = db.Column(db.Integer, db.ForeignKey('categories.id'))
 
 class Order(db.Model):
+    __tablename__ = 'orders'
+    
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(20), unique=True, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(20), default='pending')
     payment_status = db.Column(db.String(20), default='pending')
@@ -74,26 +127,48 @@ class Order(db.Model):
     delivery_address = db.Column(db.String(200))
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    customer = db.relationship('User', backref='orders')
+    items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
 
 class OrderItem(db.Model):
+    __tablename__ = 'order_items'
+    
     id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
     product = db.relationship('Product')
 
 class Notification(db.Model):
+    __tablename__ = 'notifications'
+    
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     title = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
     type = db.Column(db.String(20), default='info')
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    user = db.relationship('User', backref='notifications')
+
+class LoginAttempt(db.Model):
+    __tablename__ = 'login_attempts'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), index=True)
+    ip_address = db.Column(db.String(45), index=True)
+    success = db.Column(db.Boolean, default=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+class AuditLog(db.Model):
+    __tablename__ = 'audit_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    action = db.Column(db.String(100), nullable=False)
+    details = db.Column(db.Text)
+    ip_address = db.Column(db.String(45))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 # ==================== HELPERS ====================
 
@@ -105,7 +180,7 @@ def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.is_admin:
-            flash('Admin access required.', 'danger')
+            flash('⚠️ Admin access required.', 'danger')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated
@@ -114,7 +189,7 @@ def super_admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.is_super_admin:
-            flash('Super admin access required.', 'danger')
+            flash('⚠️ Super admin access required.', 'danger')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated
@@ -131,6 +206,22 @@ def validate_password(password):
     if not re.search(r'[!@#$%^&*]', password):
         return False, "Password must contain a special character"
     return True, "Valid password"
+
+def log_audit(user_id, action, details, ip):
+    try:
+        log = AuditLog(user_id=user_id, action=action, details=details, ip_address=ip)
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"Audit log error: {str(e)}")
+
+def notify_user(user_id, title, message, type='info'):
+    try:
+        notification = Notification(user_id=user_id, title=title, message=message, type=type)
+        db.session.add(notification)
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"Notification error: {str(e)}")
 
 # ==================== ROUTES ====================
 
@@ -161,31 +252,79 @@ def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
     return render_template('product_detail.html', product=product)
 
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
+@app.route('/contact')
+def contact():
+    return render_template('contact.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('admin_dashboard' if current_user.is_admin else 'customer_dashboard'))
     
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
         remember = True if request.form.get('remember') else False
+        ip = request.remote_addr
+        
+        # Rate limiting check
+        attempts = LoginAttempt.query.filter_by(
+            username=username, 
+            ip_address=ip,
+            success=False
+        ).filter(LoginAttempt.timestamp > datetime.utcnow() - timedelta(minutes=15)).count()
+        
+        if attempts >= 5:
+            flash('⚠️ Too many failed attempts. Please try again later.', 'danger')
+            return render_template('login.html')
         
         user = User.query.filter_by(username=username).first()
         
         if not user or not check_password_hash(user.password_hash, password):
-            flash('Invalid username or password.', 'danger')
+            # Log failed attempt
+            login_attempt = LoginAttempt(username=username, ip_address=ip, success=False)
+            db.session.add(login_attempt)
+            
+            if user:
+                user.failed_attempts += 1
+                if user.failed_attempts >= 5:
+                    user.locked_until = datetime.utcnow() + timedelta(minutes=30)
+                db.session.commit()
+            
+            flash('❌ Invalid username or password.', 'danger')
+            return render_template('login.html')
+        
+        # Check if account is locked
+        if user.locked_until and user.locked_until > datetime.utcnow():
+            flash('🔒 Account is temporarily locked. Please try again later.', 'danger')
             return render_template('login.html')
         
         if not user.is_active:
-            flash('Account is deactivated.', 'danger')
+            flash('❌ Account is deactivated.', 'danger')
             return render_template('login.html')
         
+        # Successful login
+        user.failed_attempts = 0
+        user.locked_until = None
         user.last_login = datetime.utcnow()
+        user.last_ip = ip
         db.session.commit()
+        
+        # Log successful login
+        login_attempt = LoginAttempt(username=username, ip_address=ip, success=True)
+        db.session.add(login_attempt)
+        db.session.commit()
+        
+        log_audit(user.id, 'LOGIN', f'User logged in from IP {ip}', ip)
+        
         login_user(user, remember=remember)
         
-        flash(f'Welcome back, {user.full_name}!', 'success')
+        flash(f'✅ Welcome back, {user.full_name}!', 'success')
+        
         if user.is_admin:
             return redirect(url_for('admin_dashboard'))
         return redirect(url_for('customer_dashboard'))
@@ -195,30 +334,33 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    ip = request.remote_addr
+    log_audit(current_user.id, 'LOGOUT', f'User logged out from IP {ip}', ip)
     logout_user()
-    flash('You have been logged out.', 'info')
+    flash('👋 You have been logged out.', 'info')
     return redirect(url_for('index'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        full_name = request.form.get('full_name')
-        phone = request.form.get('phone')
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        full_name = request.form.get('full_name', '').strip()
+        phone = request.form.get('phone', '').strip()
         
+        # Validate
         if User.query.filter_by(username=username).first():
-            flash('Username already exists.', 'danger')
+            flash('❌ Username already exists.', 'danger')
             return render_template('register.html')
         
         if User.query.filter_by(email=email).first():
-            flash('Email already registered.', 'danger')
+            flash('❌ Email already registered.', 'danger')
             return render_template('register.html')
         
         valid, msg = validate_password(password)
         if not valid:
-            flash(msg, 'danger')
+            flash(f'❌ {msg}', 'danger')
             return render_template('register.html')
         
         user = User(
@@ -235,10 +377,108 @@ def register():
         db.session.add(user)
         db.session.commit()
         
-        flash('Registration successful! Please login.', 'success')
+        flash('✅ Registration successful! Please login.', 'success')
         return redirect(url_for('login'))
     
     return render_template('register.html')
+
+@app.route('/checkout', methods=['GET', 'POST'])
+@login_required
+def checkout():
+    if request.method == 'POST':
+        cart = session.get('cart', {})
+        if not cart:
+            flash('🛒 Your cart is empty.', 'warning')
+            return redirect(url_for('products'))
+        
+        order = Order(
+            order_number=f"ORD-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user.id}",
+            user_id=current_user.id,
+            total_amount=0,
+            delivery_address=request.form.get('delivery_address', '').strip(),
+            notes=request.form.get('notes', '').strip(),
+            status='pending',
+            payment_status='pending'
+        )
+        
+        total = 0
+        for product_id, quantity in cart.items():
+            product = Product.query.get(int(product_id))
+            if product and product.is_active:
+                subtotal = product.price * quantity
+                item = OrderItem(
+                    product_id=product.id,
+                    quantity=quantity,
+                    price=product.price,
+                    subtotal=subtotal
+                )
+                db.session.add(item)
+                total += subtotal
+        
+        order.total_amount = total
+        db.session.add(order)
+        db.session.commit()
+        
+        session.pop('cart', None)
+        
+        flash(f'✅ Order #{order.order_number} created! Please upload payment proof.', 'success')
+        return redirect(url_for('customer_order', order_id=order.id))
+    
+    cart = session.get('cart', {})
+    products = []
+    total = 0
+    for product_id, quantity in cart.items():
+        product = Product.query.get(int(product_id))
+        if product:
+            subtotal = product.price * quantity
+            total += subtotal
+            products.append({'product': product, 'quantity': quantity, 'subtotal': subtotal})
+    
+    return render_template('checkout.html', products=products, total=total)
+
+# ==================== API ROUTES ====================
+
+@app.route('/api/cart/add', methods=['POST'])
+@login_required
+def api_cart_add():
+    product_id = request.form.get('product_id')
+    quantity = int(request.form.get('quantity', 1))
+    
+    cart = session.get('cart', {})
+    cart[str(product_id)] = cart.get(str(product_id), 0) + quantity
+    session['cart'] = cart
+    
+    return jsonify({'success': True, 'message': 'Added to cart!'})
+
+@app.route('/api/cart/remove', methods=['POST'])
+@login_required
+def api_cart_remove():
+    product_id = request.form.get('product_id')
+    cart = session.get('cart', {})
+    if str(product_id) in cart:
+        del cart[str(product_id)]
+        session['cart'] = cart
+    return jsonify({'success': True})
+
+@app.route('/api/cart/get')
+@login_required
+def api_cart_get():
+    return jsonify(session.get('cart', {}))
+
+@app.route('/api/cart/count')
+@login_required
+def api_cart_count():
+    cart = session.get('cart', {})
+    count = sum(cart.values())
+    return jsonify({'count': count})
+
+@app.route('/health')
+def health():
+    try:
+        db.session.execute(text('SELECT 1'))
+        return jsonify({'status': 'healthy', 'database': 'connected'})
+    except Exception as e:
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
 # ==================== CUSTOMER ROUTES ====================
 
@@ -250,7 +490,12 @@ def customer_dashboard():
     
     orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).limit(10).all()
     notifications = Notification.query.filter_by(user_id=current_user.id, is_read=False).all()
-    return render_template('customer/dashboard.html', orders=orders, notifications=notifications)
+    cart_count = sum(session.get('cart', {}).values())
+    
+    return render_template('customer/dashboard.html', 
+                         orders=orders, 
+                         notifications=notifications,
+                         cart_count=cart_count)
 
 @app.route('/customer/orders')
 @login_required
@@ -263,7 +508,7 @@ def customer_orders():
 def customer_order(order_id):
     order = Order.query.get_or_404(order_id)
     if order.user_id != current_user.id:
-        flash('Access denied.', 'danger')
+        flash('⚠️ Access denied.', 'danger')
         return redirect(url_for('customer_dashboard'))
     return render_template('customer/order_detail.html', order=order)
 
@@ -275,6 +520,27 @@ def customer_notifications():
         n.is_read = True
     db.session.commit()
     return render_template('customer/notifications.html', notifications=notifications)
+
+@app.route('/customer/profile', methods=['GET', 'POST'])
+@login_required
+def customer_profile():
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', '').strip()
+        phone = request.form.get('phone', '').strip()
+        address = request.form.get('address', '').strip()
+        
+        if full_name:
+            current_user.full_name = full_name
+        if phone:
+            current_user.phone = phone
+        if address:
+            current_user.address = address
+        
+        db.session.commit()
+        flash('✅ Profile updated successfully!', 'success')
+        return redirect(url_for('customer_profile'))
+    
+    return render_template('customer/profile.html')
 
 # ==================== ADMIN ROUTES ====================
 
@@ -288,6 +554,8 @@ def admin_dashboard():
     pending_payments = Order.query.filter_by(payment_status='pending').count()
     pending_orders = Order.query.filter_by(status='pending').count()
     recent_orders = Order.query.order_by(Order.created_at.desc()).limit(10).all()
+    total_products = Product.query.filter_by(is_active=True).count()
+    out_of_stock = Product.query.filter_by(stock=0, is_active=True).count()
     
     return render_template('admin/dashboard.html',
                          total_customers=total_customers,
@@ -295,7 +563,9 @@ def admin_dashboard():
                          total_revenue=total_revenue,
                          pending_payments=pending_payments,
                          pending_orders=pending_orders,
-                         recent_orders=recent_orders)
+                         recent_orders=recent_orders,
+                         total_products=total_products,
+                         out_of_stock=out_of_stock)
 
 @app.route('/admin/products')
 @login_required
@@ -310,19 +580,19 @@ def admin_products():
 @admin_required
 def admin_product_create():
     if request.method == 'POST':
-        name = request.form.get('name')
-        description = request.form.get('description')
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
         price = float(request.form.get('price', 0))
         stock = int(request.form.get('stock', 0))
         category_id = request.form.get('category_id')
-        whatsapp_link = request.form.get('whatsapp_link')
+        whatsapp_link = request.form.get('whatsapp_link', '').strip()
         
         product = Product(
             name=name,
             description=description,
             price=price,
             stock=stock,
-            category_id=category_id,
+            category_id=category_id if category_id else None,
             whatsapp_link=whatsapp_link,
             is_active=True
         )
@@ -337,7 +607,8 @@ def admin_product_create():
         
         db.session.add(product)
         db.session.commit()
-        flash('Product created successfully!', 'success')
+        log_audit(current_user.id, 'CREATE_PRODUCT', f'Created product: {name}', request.remote_addr)
+        flash('✅ Product created successfully!', 'success')
         return redirect(url_for('admin_products'))
     
     categories = Category.query.all()
@@ -350,12 +621,12 @@ def admin_product_edit(product_id):
     product = Product.query.get_or_404(product_id)
     
     if request.method == 'POST':
-        product.name = request.form.get('name')
-        product.description = request.form.get('description')
+        product.name = request.form.get('name', '').strip()
+        product.description = request.form.get('description', '').strip()
         product.price = float(request.form.get('price', 0))
         product.stock = int(request.form.get('stock', 0))
         product.category_id = request.form.get('category_id')
-        product.whatsapp_link = request.form.get('whatsapp_link')
+        product.whatsapp_link = request.form.get('whatsapp_link', '').strip()
         product.is_active = bool(request.form.get('is_active'))
         
         if 'image' in request.files:
@@ -367,7 +638,8 @@ def admin_product_edit(product_id):
                 product.image = filepath
         
         db.session.commit()
-        flash('Product updated successfully!', 'success')
+        log_audit(current_user.id, 'EDIT_PRODUCT', f'Edited product: {product.name}', request.remote_addr)
+        flash('✅ Product updated successfully!', 'success')
         return redirect(url_for('admin_products'))
     
     categories = Category.query.all()
@@ -378,9 +650,11 @@ def admin_product_edit(product_id):
 @admin_required
 def admin_product_delete(product_id):
     product = Product.query.get_or_404(product_id)
+    name = product.name
     db.session.delete(product)
     db.session.commit()
-    flash('Product deleted.', 'success')
+    log_audit(current_user.id, 'DELETE_PRODUCT', f'Deleted product: {name}', request.remote_addr)
+    flash('🗑️ Product deleted.', 'success')
     return redirect(url_for('admin_products'))
 
 @app.route('/admin/orders')
@@ -407,25 +681,32 @@ def admin_order(order_id):
 def admin_order_update(order_id):
     order = Order.query.get_or_404(order_id)
     action = request.form.get('action')
+    reason = request.form.get('reason', '').strip()
     
     if action == 'approve':
         order.status = 'processing'
         order.payment_status = 'approved'
-        notify_user(order.user_id, 'Payment Approved', f'Payment for order #{order.order_number} approved.')
+        notify_user(order.user_id, '✅ Payment Approved', f'Your payment for order #{order.order_number} has been approved.')
+        log_audit(current_user.id, 'APPROVE_PAYMENT', f'Approved payment for order {order.order_number}', request.remote_addr)
+    
     elif action == 'reject':
         order.status = 'cancelled'
         order.payment_status = 'rejected'
-        reason = request.form.get('reason', 'Payment verification failed')
-        notify_user(order.user_id, 'Payment Rejected', f'Order #{order.order_number} rejected: {reason}')
+        notify_user(order.user_id, '❌ Payment Rejected', f'Order #{order.order_number} rejected: {reason or "Payment verification failed"}')
+        log_audit(current_user.id, 'REJECT_PAYMENT', f'Rejected payment for order {order.order_number}', request.remote_addr)
+    
     elif action == 'complete':
         order.status = 'completed'
-        notify_user(order.user_id, 'Order Completed', f'Order #{order.order_number} completed.')
+        notify_user(order.user_id, '🎉 Order Completed', f'Your order #{order.order_number} has been completed.')
+        log_audit(current_user.id, 'COMPLETE_ORDER', f'Completed order {order.order_number}', request.remote_addr)
+    
     elif action == 'cancel':
         order.status = 'cancelled'
-        notify_user(order.user_id, 'Order Cancelled', f'Order #{order.order_number} cancelled.')
+        notify_user(order.user_id, '⚠️ Order Cancelled', f'Order #{order.order_number} has been cancelled.')
+        log_audit(current_user.id, 'CANCEL_ORDER', f'Cancelled order {order.order_number}', request.remote_addr)
     
     db.session.commit()
-    flash(f'Order updated to {order.status}.', 'success')
+    flash(f'✅ Order updated to {order.status}.', 'success')
     return redirect(url_for('admin_order', order_id=order_id))
 
 @app.route('/admin/customers')
@@ -447,20 +728,20 @@ def admin_admins():
 @super_admin_required
 def admin_admin_create():
     if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        full_name = request.form.get('full_name')
-        phone = request.form.get('phone')
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        full_name = request.form.get('full_name', '').strip()
+        phone = request.form.get('phone', '').strip()
         is_super_admin = bool(request.form.get('is_super_admin'))
         
         if User.query.filter_by(username=username).first():
-            flash('Username already exists.', 'danger')
+            flash('❌ Username already exists.', 'danger')
             return render_template('admin/admin_form.html')
         
         valid, msg = validate_password(password)
         if not valid:
-            flash(msg, 'danger')
+            flash(f'❌ {msg}', 'danger')
             return render_template('admin/admin_form.html')
         
         admin = User(
@@ -476,7 +757,8 @@ def admin_admin_create():
         
         db.session.add(admin)
         db.session.commit()
-        flash('Admin created successfully!', 'success')
+        log_audit(current_user.id, 'CREATE_ADMIN', f'Created admin: {username}', request.remote_addr)
+        flash('✅ Admin created successfully!', 'success')
         return redirect(url_for('admin_admins'))
     
     return render_template('admin/admin_form.html')
@@ -487,12 +769,13 @@ def admin_admin_create():
 def admin_admin_toggle(admin_id):
     admin = User.query.get_or_404(admin_id)
     if admin.id == current_user.id:
-        flash('Cannot modify your own account.', 'danger')
+        flash('⚠️ Cannot modify your own account.', 'danger')
         return redirect(url_for('admin_admins'))
     
     admin.is_active = not admin.is_active
     db.session.commit()
-    flash(f'Admin {"activated" if admin.is_active else "deactivated"}.', 'success')
+    log_audit(current_user.id, 'TOGGLE_ADMIN', f"{'Activated' if admin.is_active else 'Deactivated'} admin: {admin.username}", request.remote_addr)
+    flash(f'✅ Admin {"activated" if admin.is_active else "deactivated"}.', 'success')
     return redirect(url_for('admin_admins'))
 
 @app.route('/admin/admin/delete/<int:admin_id>')
@@ -501,119 +784,41 @@ def admin_admin_toggle(admin_id):
 def admin_admin_delete(admin_id):
     admin = User.query.get_or_404(admin_id)
     if admin.id == current_user.id:
-        flash('Cannot delete your own account.', 'danger')
+        flash('⚠️ Cannot delete your own account.', 'danger')
         return redirect(url_for('admin_admins'))
     
-    # Prevent deleting last super admin
     if admin.is_super_admin and User.query.filter_by(is_super_admin=True).count() <= 1:
-        flash('Cannot delete the last super admin.', 'danger')
+        flash('⚠️ Cannot delete the last super admin.', 'danger')
         return redirect(url_for('admin_admins'))
     
+    username = admin.username
     db.session.delete(admin)
     db.session.commit()
-    flash('Admin deleted.', 'success')
+    log_audit(current_user.id, 'DELETE_ADMIN', f'Deleted admin: {username}', request.remote_addr)
+    flash('🗑️ Admin deleted.', 'success')
     return redirect(url_for('admin_admins'))
 
-# ==================== HELPERS ====================
-
-def notify_user(user_id, title, message):
-    notification = Notification(user_id=user_id, title=title, message=message)
-    db.session.add(notification)
-    db.session.commit()
-
-# ==================== API ROUTES ====================
-
-@app.route('/api/cart/add', methods=['POST'])
+@app.route('/admin/audit-logs')
 @login_required
-def api_cart_add():
-    product_id = request.form.get('product_id')
-    quantity = int(request.form.get('quantity', 1))
-    
-    cart = session.get('cart', {})
-    cart[str(product_id)] = cart.get(str(product_id), 0) + quantity
-    session['cart'] = cart
-    
-    return jsonify({'success': True})
+@super_admin_required
+def admin_audit_logs():
+    logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(100).all()
+    return render_template('admin/audit_logs.html', logs=logs)
 
-@app.route('/api/cart/remove', methods=['POST'])
-@login_required
-def api_cart_remove():
-    product_id = request.form.get('product_id')
-    cart = session.get('cart', {})
-    if str(product_id) in cart:
-        del cart[str(product_id)]
-        session['cart'] = cart
-    return jsonify({'success': True})
+# ==================== ERROR HANDLERS ====================
 
-@app.route('/api/cart/get')
-@login_required
-def api_cart_get():
-    return jsonify(session.get('cart', {}))
+@app.errorhandler(404)
+def not_found(error):
+    return render_template('404.html'), 404
 
-@app.route('/health')
-def health():
-    try:
-        db.session.execute(text('SELECT 1'))
-        return jsonify({'status': 'healthy', 'database': 'connected'})
-    except:
-        return jsonify({'status': 'unhealthy'}), 500
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    return render_template('500.html'), 500
 
-# ==================== CREATE ORDER ====================
-
-@app.route('/checkout', methods=['GET', 'POST'])
-@login_required
-def checkout():
-    if request.method == 'POST':
-        cart = session.get('cart', {})
-        if not cart:
-            flash('Cart is empty.', 'warning')
-            return redirect(url_for('products'))
-        
-        # Create order
-        order = Order(
-            order_number=f"ORD-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{current_user.id}",
-            user_id=current_user.id,
-            total_amount=0,
-            delivery_address=request.form.get('delivery_address'),
-            notes=request.form.get('notes'),
-            status='pending',
-            payment_status='pending'
-        )
-        
-        total = 0
-        for product_id, quantity in cart.items():
-            product = Product.query.get(int(product_id))
-            if product and product.is_active:
-                subtotal = product.price * quantity
-                item = OrderItem(
-                    product_id=product.id,
-                    quantity=quantity,
-                    price=product.price,
-                    subtotal=subtotal
-                )
-                db.session.add(item)
-                total += subtotal
-        
-        order.total_amount = total
-        db.session.add(order)
-        db.session.commit()
-        
-        session.pop('cart', None)
-        
-        flash(f'Order #{order.order_number} created! Please upload payment proof.', 'success')
-        return redirect(url_for('customer_order', order_id=order.id))
-    
-    cart = session.get('cart', {})
-    products = []
-    total = 0
-    for product_id, quantity in cart.items():
-        product = Product.query.get(int(product_id))
-        if product:
-            subtotal = product.price * quantity
-            total += subtotal
-            products.append({'product': product, 'quantity': quantity, 'subtotal': subtotal})
-    
-    return render_template('checkout.html', products=products, total=total)
+@app.errorhandler(403)
+def forbidden(error):
+    return render_template('403.html'), 403
 
 # ==================== INITIALIZE DATABASE ====================
 
@@ -621,7 +826,7 @@ def init_db():
     with app.app_context():
         db.create_all()
         
-        # Create categories
+        # Create categories (only structure, no demo products)
         categories = ['Electronics', 'Clothing', 'Food', 'Home & Living', 
                      'Beauty', 'Books', 'Sports', 'Toys', 'Auto', 'Phones']
         for cat_name in categories:
@@ -643,36 +848,15 @@ def init_db():
             )
             db.session.add(admin)
         
-        # Create demo products
-        if Product.query.count() == 0:
-            electronics = Category.query.filter_by(name='Electronics').first()
-            if electronics:
-                products = [
-                    Product(
-                        name='Smartphone Pro X1',
-                        description='Latest smartphone with amazing features',
-                        price=250000,
-                        stock=10,
-                        category_id=electronics.id,
-                        is_active=True,
-                        whatsapp_link='https://wa.me/25770000000'
-                    ),
-                    Product(
-                        name='Laptop Ultra 15"',
-                        description='High performance laptop for work and gaming',
-                        price=750000,
-                        stock=5,
-                        category_id=electronics.id,
-                        is_active=True,
-                        whatsapp_link='https://wa.me/25770000000'
-                    )
-                ]
-                for product in products:
-                    db.session.add(product)
-        
         db.session.commit()
-        print("✅ Database initialized!")
-        print("✅ Super Admin: MCM / 08800Mcm!")
+        print("=" * 50)
+        print("✅ Database initialized successfully!")
+        print("=" * 50)
+        print("🔐 Super Admin: MCM")
+        print("🔑 Password: 08800Mcm!")
+        print("=" * 50)
+        print("📦 Categories created. You can now add real products.")
+        print("=" * 50)
 
 # ==================== RUN APPLICATION ====================
 

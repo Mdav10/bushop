@@ -2,37 +2,251 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>BuShop - {% block title %}Buy with Confidence{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; }
-        .navbar-brand { font-weight: bold; font-size: 1.5rem; }
-        .card { border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); transition: transform 0.3s; }
-        .card:hover { transform: translateY(-5px); }
-        .jumbotron { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px; padding: 3rem; }
-        .jumbotron .btn-primary { background: white; color: #667eea; border: none; }
-        .jumbotron .btn-primary:hover { background: #f0f0f0; }
-        .product-image { height: 200px; object-fit: cover; }
-        .badge-status { padding: 5px 12px; border-radius: 20px; }
-        .admin-stat { border-radius: 10px; padding: 20px; color: white; }
-        .admin-stat h3 { font-size: 2rem; margin: 0; }
-        .admin-stat .stat-number { font-size: 2.5rem; font-weight: bold; }
-        .footer { background: #2d3748; color: white; padding: 2rem 0; margin-top: 3rem; }
-        .footer a { color: #a0aec0; text-decoration: none; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+            background: #f0f2f5; 
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .navbar-brand { 
+            font-weight: 800; 
+            font-size: 1.5rem; 
+            background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .navbar { 
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%) !important;
+            padding: 0.8rem 0;
+        }
+        .nav-link { 
+            color: rgba(255,255,255,0.8) !important; 
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1rem !important;
+            border-radius: 8px;
+        }
+        .nav-link:hover { 
+            color: #fff !important; 
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-1px);
+        }
+        .nav-link i { margin-right: 6px; }
+        .card { 
+            border-radius: 16px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06); 
+            transition: all 0.3s ease;
+            border: none;
+            background: #fff;
+            overflow: hidden;
+        }
+        .card:hover { 
+            transform: translateY(-4px); 
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+        .btn { 
+            border-radius: 12px; 
+            padding: 0.6rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        .btn-success { 
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        .btn-success:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(17, 153, 142, 0.4);
+        }
+        .btn-danger { 
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        .btn-danger:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(245, 87, 108, 0.4);
+        }
+        .btn-warning { 
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #333;
+        }
+        .btn-warning:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(253, 160, 133, 0.4);
+        }
+        .product-image { 
+            height: 220px; 
+            object-fit: cover; 
+            width: 100%;
+        }
+        .badge-status { 
+            padding: 6px 14px; 
+            border-radius: 20px; 
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+        .admin-stat { 
+            border-radius: 16px; 
+            padding: 1.5rem; 
+            color: white; 
+            transition: all 0.3s ease;
+        }
+        .admin-stat:hover { transform: translateY(-4px); }
+        .admin-stat .stat-number { font-size: 2.5rem; font-weight: 800; }
+        .admin-stat .stat-label { font-size: 0.9rem; opacity: 0.9; }
+        .footer { 
+            background: #1a1a2e; 
+            color: rgba(255,255,255,0.8); 
+            padding: 3rem 0 1.5rem;
+            margin-top: auto;
+        }
+        .footer a { color: rgba(255,255,255,0.6); text-decoration: none; transition: color 0.3s; }
         .footer a:hover { color: white; }
+        .footer h5 { color: white; font-weight: 700; margin-bottom: 1.2rem; }
+        .jumbotron { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            border-radius: 20px; 
+            padding: 3rem 2.5rem;
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        }
+        .jumbotron .btn-primary { 
+            background: white; 
+            color: #667eea; 
+            border: none;
+            font-weight: 700;
+        }
+        .jumbotron .btn-primary:hover { 
+            background: #f0f0f0; 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255,255,255,0.3);
+        }
+        .alert { 
+            border-radius: 12px; 
+            border: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        .section-title { 
+            font-weight: 800; 
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+        .section-title:after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 50px;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+        }
+        .text-gradient { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .cart-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #f5576c;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            border: 2px solid white;
+        }
+        .position-relative { position: relative; }
+        .glass-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        @media (max-width: 768px) {
+            .jumbotron { padding: 2rem 1.5rem; }
+            .jumbotron h1 { font-size: 1.8rem; }
+            .product-image { height: 180px; }
+            .admin-stat .stat-number { font-size: 1.8rem; }
+            .navbar-brand { font-size: 1.2rem; }
+            .container { padding-left: 12px; padding-right: 12px; }
+            .card { border-radius: 12px; }
+            .btn { padding: 0.5rem 1rem; font-size: 0.9rem; }
+            .footer { padding: 2rem 0 1rem; }
+        }
+        @media (max-width: 576px) {
+            .product-image { height: 150px; }
+            .jumbotron h1 { font-size: 1.5rem; }
+            .admin-stat { padding: 1rem; }
+            .admin-stat .stat-number { font-size: 1.5rem; }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        .table-responsive {
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .table th {
+            background: #f8f9fa;
+            font-weight: 700;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .table td {
+            vertical-align: middle;
+        }
+        .shadow-hover:hover {
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+        .border-radius-12 { border-radius: 12px; }
+        .overflow-hidden { overflow: hidden; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg">
         <div class="container">
             <a class="navbar-brand" href="/"><i class="bi bi-shop"></i> BuShop</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                    style="color: white; font-size: 1.5rem;">
+                <i class="bi bi-list"></i>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="/"><i class="bi bi-house"></i> Home</a></li>
                     <li class="nav-item"><a class="nav-link" href="/products"><i class="bi bi-grid"></i> Products</a></li>
                     {% if current_user.is_authenticated and not current_user.is_admin %}
                     <li class="nav-item"><a class="nav-link" href="/customer/dashboard"><i class="bi bi-person"></i> Dashboard</a></li>
@@ -41,28 +255,42 @@
                     <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="bi bi-speedometer2"></i> Admin</a></li>
                     {% endif %}
                     {% if current_user.is_authenticated and current_user.is_admin and current_user.is_super_admin %}
-                    <li class="nav-item"><a class="nav-link" href="/admin/admins"><i class="bi bi-people"></i> Admins</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/admin/admins"><i class="bi bi-shield-lock"></i> Admins</a></li>
                     {% endif %}
                 </ul>
-                <ul class="navbar-nav ms-auto">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
                     {% if current_user.is_authenticated %}
-                    <li class="nav-item"><a class="nav-link" href="/customer/dashboard"><i class="bi bi-person-circle"></i> {{ current_user.full_name }}</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/customer/dashboard">
+                            <i class="bi bi-person-circle"></i> {{ current_user.full_name.split()[0] }}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/logout">
+                            <i class="bi bi-box-arrow-right"></i> <span class="d-none d-lg-inline">Logout</span>
+                        </a>
+                    </li>
                     {% else %}
                     <li class="nav-item"><a class="nav-link" href="/login"><i class="bi bi-box-arrow-in-right"></i> Login</a></li>
                     <li class="nav-item"><a class="nav-link" href="/register"><i class="bi bi-person-plus"></i> Register</a></li>
                     {% endif %}
+                    <li class="nav-item position-relative ms-2">
+                        <a class="nav-link" href="/checkout" style="position: relative;">
+                            <i class="bi bi-cart fs-5"></i>
+                            <span class="cart-badge" id="cartCount">0</span>
+                        </a>
+                    </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <main class="container py-4">
+    <main class="container py-4 fade-in">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show">
-                        {{ message }}
+                    <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show shadow-sm">
+                        {{ message|safe }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 {% endfor %}
@@ -73,27 +301,36 @@
 
     <footer class="footer">
         <div class="container">
-            <div class="row">
+            <div class="row g-4">
                 <div class="col-md-4">
                     <h5><i class="bi bi-shop"></i> BuShop</h5>
-                    <p>Your trusted online shopping platform in Burundi.</p>
+                    <p class="text-muted">Your trusted online shopping platform in Burundi.</p>
+                    <div class="d-flex gap-3">
+                        <a href="#" class="text-white-50"><i class="bi bi-facebook fs-5"></i></a>
+                        <a href="#" class="text-white-50"><i class="bi bi-instagram fs-5"></i></a>
+                        <a href="#" class="text-white-50"><i class="bi bi-twitter fs-5"></i></a>
+                        <a href="#" class="text-white-50"><i class="bi bi-whatsapp fs-5"></i></a>
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <h5>Quick Links</h5>
                     <ul class="list-unstyled">
                         <li><a href="/products">Products</a></li>
-                        <li><a href="/about">About</a></li>
+                        <li><a href="/about">About Us</a></li>
                         <li><a href="/contact">Contact</a></li>
                     </ul>
                 </div>
                 <div class="col-md-4">
                     <h5>Payment</h5>
-                    <p>We accept Lumicash payments</p>
-                    <i class="bi bi-phone fs-2"></i> <i class="bi bi-credit-card fs-2"></i>
+                    <p class="text-muted">We accept Lumicash payments</p>
+                    <div class="d-flex gap-3">
+                        <i class="bi bi-phone fs-1 text-success"></i>
+                        <i class="bi bi-credit-card fs-1 text-primary"></i>
+                    </div>
                 </div>
             </div>
-            <hr class="bg-secondary">
-            <p class="text-center mb-0">&copy; 2026 BuShop. All rights reserved.</p>
+            <hr class="bg-secondary opacity-25 my-3">
+            <p class="text-center text-muted small mb-0">&copy; 2026 BuShop. All rights reserved.</p>
         </div>
     </footer>
 
@@ -108,13 +345,64 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('Product added to cart!');
+                    updateCartCount();
+                    showToast('🛒 Product added to cart!', 'success');
                 }
             })
-            .catch(error => {
-                alert('Please login to add items to cart.');
+            .catch(() => {
+                showToast('⚠️ Please login to add items to cart.', 'warning');
             });
         }
+
+        function updateCartCount() {
+            fetch('/api/cart/count')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.getElementById('cartCount');
+                    if (badge) {
+                        badge.textContent = data.count;
+                        badge.style.display = data.count > 0 ? 'inline' : 'none';
+                    }
+                })
+                .catch(() => {});
+        }
+
+        function showToast(message, type = 'info') {
+            const colors = {
+                success: '#10b981',
+                warning: '#f59e0b',
+                danger: '#ef4444',
+                info: '#3b82f6'
+            };
+            const toast = document.createElement('div');
+            toast.className = 'position-fixed bottom-0 end-0 m-3 p-3 rounded-3 shadow-lg text-white';
+            toast.style.backgroundColor = colors[type] || colors.info;
+            toast.style.zIndex = '9999';
+            toast.style.maxWidth = '350px';
+            toast.style.animation = 'fadeIn 0.3s ease';
+            toast.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <span>${message}</span>
+                    <button class="btn-close btn-close-white ms-3" onclick="this.parentElement.parentElement.remove()"></button>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                if (toast.parentElement) toast.remove();
+            }, 4000);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCartCount();
+            
+            // Auto-dismiss alerts
+            setTimeout(() => {
+                document.querySelectorAll('.alert').forEach(el => {
+                    const closeBtn = el.querySelector('.btn-close');
+                    if (closeBtn) closeBtn.click();
+                });
+            }, 5000);
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>
