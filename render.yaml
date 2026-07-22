@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: bushop
+    env: python
+    buildCommand: |
+      pip install -r requirements.txt
+      python -c "from app import create_app, db; from app.models import User; app = create_app(); db.create_all()"
+    startCommand: gunicorn run:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bushop-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CSRF_SECRET_KEY
+        generateValue: true
+      - key: SECURITY_PASSWORD_SALT
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: FLASK_ENV
+        value: production
+    buildFilter:
+      paths:
+        - app/**
+        - requirements.txt
+        - run.py
+        - render.yaml
+    healthCheckPath: /
+    autoDeploy: true
+    plan: free
+
+databases:
+  - name: bushop-db
+    databaseName: bushop
+    user: bushop_user
+    plan: free
+    postgresMajorVersion: 15

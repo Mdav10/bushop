@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs - BuShop{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Audit Logs</h1>
+    <span class="badge bg-primary">{{ logs|length }} recent entries</span>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>{{ log.user.full_name if log.user else 'System' }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if 'DELETE' in log.action or 'REJECT' in log.action else 'warning' if 'TOGGLE' in log.action else 'success' if 'CREATE' in log.action else 'info' }}">
+                                {{ log.action }}
+                            </span>
+                        </td>
+                        <td>{{ log.details }}</td>
+                        <td>{{ log.ip_address or 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+{% endblock %}

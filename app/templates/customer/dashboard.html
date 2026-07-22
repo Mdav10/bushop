@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}My Dashboard - BuShop{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-3">
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <i class="bi bi-person-circle display-4 text-primary"></i>
+                <h5>{{ current_user.full_name }}</h5>
+                <p class="text-muted">{{ current_user.email }}</p>
+                <a href="{{ url_for('auth.profile') }}" class="btn btn-outline-primary btn-sm">Edit Profile</a>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h5>Quick Stats</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Total Orders:</strong> {{ current_user.orders.count() }}</p>
+                <p><strong>Total Spent:</strong> {{ "{:,.0f}".format(current_user.get_total_spent()) }} FBu</p>
+                <p><strong>VIP:</strong> {{ 'Yes' if current_user.is_vip() else 'No' }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Orders</h5>
+            </div>
+            <div class="card-body">
+                {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Date</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Payment</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr>
+                                <td>{{ order.order_number }}</td>
+                                <td>{{ order.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ "{:,.0f}".format(order.total_amount) }} FBu</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if order.status == 'completed' else 'warning' if order.status == 'pending' else 'info' if order.status == 'processing' else 'danger' }}">
+                                        {{ order.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if order.payment_status == 'approved' else 'warning' if order.payment_status == 'pending' else 'danger' }}">
+                                        {{ order.payment_status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('customer.view_order', order_id=order.id) }}" class="btn btn-sm btn-info">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="{{ url_for('customer.orders') }}" class="btn btn-primary">View All Orders</a>
+                {% else %}
+                <p class="text-center text-muted">You haven't placed any orders yet.</p>
+                <a href="{{ url_for('main.products') }}" class="btn btn-primary">Start Shopping</a>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if notifications %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Notifications</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    {% for notification in notifications %}
+                    <li class="list-group-item">
+                        <strong>{{ notification.title }}</strong><br>
+                        {{ notification.message }}
+                        <small class="text-muted d-block">{{ notification.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <a href="{{ url_for('customer.notifications') }}" class="btn btn-link mt-2">View all notifications</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

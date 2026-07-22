@@ -1,0 +1,122 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.card {
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-img-top {
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+}
+
+.jumbotron {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+}
+
+.jumbotron .btn-primary {
+    background-color: white;
+    color: #667eea;
+    border: none;
+}
+
+.jumbotron .btn-primary:hover {
+    background-color: #f0f0f0;
+}
+
+.admin-stat-card {
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    color: white;
+}
+
+.admin-stat-card h3 {
+    margin: 0;
+    font-size: 2rem;
+}
+
+.admin-stat-card p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .product-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+
+.notification-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.notification-dot.unread {
+    background-color: #dc3545;
+}
+
+.notification-dot.read {
+    background-color: #28a745;
+}
+
+.payment-proof-preview {
+    max-width: 300px;
+    max-height: 300px;
+    margin: 10px 0;
+}
+
+.status-badge {
+    font-size: 0.8rem;
+    padding: 5px 10px;
+    border-radius: 20px;
+}
+
+.admin-sidebar {
+    background-color: #2c3e50;
+    min-height: 100vh;
+    padding: 20px 0;
+}
+
+.admin-sidebar .nav-link {
+    color: #ecf0f1;
+    padding: 10px 20px;
+    border-radius: 5px;
+    margin-bottom: 5px;
+}
+
+.admin-sidebar .nav-link:hover,
+.admin-sidebar .nav-link.active {
+    background-color: #34495e;
+    color: #fff;
+}
+
+.admin-sidebar .nav-link i {
+    margin-right: 10px;
+}
+
+.product-image-preview {
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
